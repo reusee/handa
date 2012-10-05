@@ -19,7 +19,7 @@ var (
 
 type Handa struct {
   mysqlConnPool chan *autorc.Conn
-  socketConnPool chan *tdh.Tdh
+  socketConnPool chan *tdh.Conn
 
   dbname string
   schema map[string]*TableInfo
@@ -36,7 +36,7 @@ func New(host string, port string, user string, password string, database string
     conn.Register("set names utf8")
     self.mysqlConnPool <- conn
   }
-  self.socketConnPool = make(chan *tdh.Tdh, SocketConnPoolSize)
+  self.socketConnPool = make(chan *tdh.Conn, SocketConnPoolSize)
   for i := 0; i < SocketConnPoolSize; i++ {
     socket, err := tdh.New(host + ":" + tdhPort, "", "")
     if err != nil {
@@ -106,15 +106,45 @@ func (self *Handa) mysqlQuery(sql string, args ...interface{}) ([]mysql.Row, mys
   return conn.Query(sql, args...)
 }
 
-func (self *Handa) Set(table string, index string, key interface{}, fieldList string, values ...interface{}) {
+func (self *Handa) withSocket(fun func(*tdh.Conn)) {
+  socket := <-self.socketConnPool
+  defer func() {
+    self.socketConnPool <- socket
+  }()
+  fun(socket)
+}
+
+func (self *Handa) Set(table string, index string, key interface{}, fieldList string, values ...interface{}) (err error) {
   self.ensureTableExists(table)
-  self.ensureColumnExists(table, index, key)
+  keyStr, t, _ := convertToString(key)
+  self.ensureColumnExists(table, index, t)
   self.ensureIndexExists(table, index)
   fields := strings.Split(fieldList, ",")
+  valueStrs := make([]string, len(values))
   for i, field := range fields {
     fields[i] = strings.TrimSpace(field)
-    self.ensureColumnExists(table, fields[i], values[i])
+    valueStr, t, _ := convertToString(values[i])
+    valueStrs[i] = valueStr
+    self.ensureColumnExists(table, fields[i], t)
   }
+  self.withSocket(func (db *tdh.Conn) {
+    var count int
+    count, _, err = db.Update(self.dbname, table, index, fields, [][]string{[]string{keyStr}}, 
+      tdh.EQ, 0, 0, nil, valueStrs)
+    if err != nil {
+      return
+    }
+    if count == 0 { // not exists, then insert
+      err = db.Insert(self.dbname, table, index, append(fields, index), append(valueStrs, keyStr))
+      if err != nil {
+        e, _ := err.(*tdh.Error)
+        if e.ClientStatus == tdh.CLIENT_STATUS_DB_ERROR && e.ErrorCode == 121 {
+          err = nil
+        }
+      }
+    }
+  })
+  return
 }
 
 func (self *Handa) ensureTableExists(table string) {
@@ -127,21 +157,19 @@ func (self *Handa) ensureTableExists(table string) {
   }
 }
 
-func (self *Handa) ensureColumnExists(table string, column string, key interface{}) {
+func (self *Handa) ensureColumnExists(table string, column string, t int) {
   _, exists := self.schema[table].columnType[column]
   if !exists {
     var columnType string
-    switch key.(type) {
-    case bool:
+    switch t {
+    case ColTypeBool:
       columnType = "BOOLEAN"
-    case int, int8, int16, int32, int64, uint, uint8, uint32, uint64:
+    case ColTypeInt:
       columnType = "BIGINT(255)"
-    case float32, float64:
+    case ColTypeFloat:
       columnType = "DOUBLE"
-    case string, []byte:
+    case ColTypeString:
       columnType = "LONGBLOB"
-    default:
-      panic("unknow type")
     }
     self.mysqlQuery("ALTER TABLE `%s` ADD (`%s` %s NULL DEFAULT NULL)", table, column, columnType)
     self.schema[table] = self.loadTableInfo(table)

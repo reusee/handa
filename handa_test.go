@@ -15,12 +15,19 @@ func TestNew(t *testing.T) {
 
 func TestSet(t *testing.T) {
   db := getDb()
-  db.Set("thread", "tid", 15, "collect", true)
-  db.Set("thread", "tid", 16, "collect", true)
-  db.Set("thread", "tid", 17, "collect", true)
-  db.Set("thread", "tid", 18, "collect", true)
+  err := db.Set("thread", "tid", 15, "collect", true)
+  if err != nil { t.Fail() }
+  err = db.Set("thread", "tid", 16, "collect", true)
+  if err != nil { t.Fail() }
+  err = db.Set("thread", "tid", 17, "collect", true)
+  if err != nil { t.Fail() }
+  err = db.Set("thread", "tid", 18, "collect", true)
+  if err != nil { t.Fail() }
 
-  db.Set("thread", "tid", 16, "ccc", 18)
-  db.Set("thread", "tid", 18, "float", 5.5)
-  db.Set("thread", "tid", 19, "subject", "哈哈哈")
+  err = db.Set("thread", "tid", 16, "ccc", 18)
+  if err != nil { t.Fail() }
+  err = db.Set("thread", "tid", 18, "float", 5.5)
+  if err != nil { t.Fail() }
+  err = db.Set("thread", "tid", 19, "subject", "哈哈哈")
+  if err != nil { t.Fail() }
 }
