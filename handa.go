@@ -114,7 +114,7 @@ func (self *Handa) withSocket(fun func(*tdh.Conn)) {
   fun(socket)
 }
 
-func (self *Handa) Set(table string, index string, key interface{}, fieldList string, values ...interface{}) (err error) {
+func (self *Handa) checkSchema(table string, index string, key interface{}, fieldList string, values ...interface{}) (string, []string, []string) {
   self.ensureTableExists(table)
   keyStr, t, _ := convertToString(key)
   self.ensureColumnExists(table, index, t)
@@ -127,6 +127,31 @@ func (self *Handa) Set(table string, index string, key interface{}, fieldList st
     valueStrs[i] = valueStr
     self.ensureColumnExists(table, fields[i], t)
   }
+  return keyStr, fields, valueStrs
+}
+
+func (self *Handa) Update(table string, index string, key interface{}, fieldList string, values ...interface{}) (count int, change int, err error) {
+  keyStr, fields, valueStrs := self.checkSchema(table, index, key, fieldList, values...)
+  self.withSocket(func (db *tdh.Conn) {
+    count, change, err = db.Update(self.dbname, table, index, fields, [][]string{[]string{keyStr}}, 
+      tdh.EQ, 0, 0, nil, valueStrs)
+    if err != nil {
+      return
+    }
+  })
+  return
+}
+
+func (self *Handa) Insert(table string, index string, key interface{}, fieldList string, values ...interface{}) (err error) {
+  keyStr, fields, valueStrs := self.checkSchema(table, index, key, fieldList, values...)
+  self.withSocket(func (db *tdh.Conn) {
+    err = db.Insert(self.dbname, table, index, append(fields, index), append(valueStrs, keyStr))
+  })
+  return
+}
+
+func (self *Handa) UpdateInsert(table string, index string, key interface{}, fieldList string, values ...interface{}) (err error) {
+  keyStr, fields, valueStrs := self.checkSchema(table, index, key, fieldList, values...)
   self.withSocket(func (db *tdh.Conn) {
     var count int
     count, _, err = db.Update(self.dbname, table, index, fields, [][]string{[]string{keyStr}}, 
@@ -141,6 +166,21 @@ func (self *Handa) Set(table string, index string, key interface{}, fieldList st
         if e.ClientStatus == tdh.CLIENT_STATUS_DB_ERROR && e.ErrorCode == 121 {
           err = nil
         }
+      }
+    }
+  })
+  return
+}
+
+func (self *Handa) InsertUpdate(table string, index string, key interface{}, fieldList string, values ...interface{}) (err error) {
+  keyStr, fields, valueStrs := self.checkSchema(table, index, key, fieldList, values...)
+  self.withSocket(func (db *tdh.Conn) {
+    err = db.Insert(self.dbname, table, index, append(fields, index), append(valueStrs, keyStr))
+    if err != nil {
+      e, _ := err.(*tdh.Error)
+      if e.ClientStatus == tdh.CLIENT_STATUS_DB_ERROR && e.ErrorCode == 121 { // update
+        _, _, err = db.Update(self.dbname, table, index, fields, [][]string{[]string{keyStr}}, 
+        tdh.EQ, 0, 0, nil, valueStrs)
       }
     }
   })
