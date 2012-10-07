@@ -156,3 +156,14 @@ func TestBatchComparison(t *testing.T) {
   wg.Wait()
   fmt.Printf("Use goroutine %v\n", time.Now().Sub(startTime))
 }
+
+func TestGetCol(t *testing.T) {
+  db := getDb()
+  res, err := db.GetCol("thread", "tid")
+  if err != nil {
+    t.Fail()
+  }
+  if !(len(res) > 0) {
+    t.Fail()
+  }
+}

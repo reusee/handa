@@ -112,3 +112,23 @@ const (
   UPDATE
   DELETE
 )
+
+func (self *Cursor) GetCol(table string, index string) ([]string, error) {
+  if !self.isValid { panic("Using an invalid cursor") }
+  if !self.isBatch { defer func() {
+    self.end <- true
+  }()}
+  self.handa.ensureIndexExists(table, index)
+  rows, _, err := self.conn.Get(self.handa.dbname, table, index, []string{index},
+    [][]string{[]string{"(null)"}}, tdh.GT, 0, 0, nil)
+  if err != nil {
+    return nil, err
+  }
+  ret := make([]string, len(rows))
+  for i, row := range rows {
+    for _, col := range row {
+      ret[i] = string(col)
+    }
+  }
+  return ret, nil
+}
