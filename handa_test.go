@@ -6,6 +6,7 @@ import (
   "math/rand"
   "fmt"
   tdh "github.com/reusee/go-tdhsocket"
+  "sync"
 )
 
 func getDb() *Handa {
@@ -128,4 +129,16 @@ func TestBatchComparison(t *testing.T) {
   }
   c.Commit()
   fmt.Printf("Batch %v\n", time.Now().Sub(startTime))
+
+  startTime = time.Now()
+  wg := new(sync.WaitGroup)
+  for i := 0; i < n; i++ {
+    wg.Add(1)
+    go func() {
+      defer wg.Done()
+      db.Insert("thread", "tid", rand.Int63(), "subject,ccc,float,collect", "comp conn", rand.Int31(), rand.Float64(), true)
+    }()
+  }
+  wg.Wait()
+  fmt.Printf("Use goroutine %v\n", time.Now().Sub(startTime))
 }
