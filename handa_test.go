@@ -9,7 +9,7 @@ import (
 )
 
 func getDb() *Handa {
-  db := New("localhost", "3306", "root", "ffffff", "test", "45678")
+  db := New("localhost", "3306", "test", "ffffff", "test", "45678")
   fmt.Printf("")
   rand.Seed(time.Now().UnixNano())
   return db

@@ -47,7 +47,7 @@ func New(host string, port string, user string, password string, database string
 
   // load table schemas
   schema := make(map[string]*TableInfo)
-  row, _, _ := self.mysqlQuery("show tables")
+  row, _, _ := self.mysqlQuery("SHOW TABLES")
   for _, row := range row {
     tableName := row.Str(0)
     schema[tableName] = self.loadTableInfo(tableName)
@@ -63,7 +63,7 @@ func (self *Handa) loadTableInfo(tableName string) *TableInfo {
     columnType: make(map[string]int),
     index: make(map[string]bool),
   }
-  r, _, _ := self.mysqlQuery("describe %s", tableName)
+  r, _, _ := self.mysqlQuery("DESCRIBE %s", tableName)
   for _, c := range r {
     columnName := c.Str(0)
     columnType := c.Str(1)
@@ -187,12 +187,23 @@ func (self *Handa) InsertUpdate(table string, index string, key interface{}, fie
   return
 }
 
+func (self *Handa) withTableCacheOff(fun func()) {
+  _, _, err := self.mysqlQuery("SET GLOBAL tdh_socket_cache_table_on=0")
+  defer self.mysqlQuery("SET GLOBAL tdh_socket_cache_table_on=1")
+  if err != nil {
+    panic("need SUPER privileges to set global variable")
+  }
+  fun()
+}
+
 func (self *Handa) ensureTableExists(table string) {
   _, exists := self.schema[table]
   if !exists {
-    self.mysqlQuery(`CREATE TABLE IF NOT EXISTS %s (
-      serial SERIAL
-    ) engine=InnoDB`, table)
+    self.withTableCacheOff(func() {
+      self.mysqlQuery(`CREATE TABLE IF NOT EXISTS %s (
+        serial SERIAL
+      ) engine=InnoDB`, table)
+    })
     self.schema[table] = self.loadTableInfo(table)
   }
 }
@@ -211,14 +222,18 @@ func (self *Handa) ensureColumnExists(table string, column string, t int) {
     case ColTypeString:
       columnType = "LONGBLOB"
     }
-    self.mysqlQuery("ALTER TABLE `%s` ADD (`%s` %s NULL DEFAULT NULL)", table, column, columnType)
+    self.withTableCacheOff(func() {
+      self.mysqlQuery("ALTER TABLE `%s` ADD (`%s` %s NULL DEFAULT NULL)", table, column, columnType)
+    })
     self.schema[table] = self.loadTableInfo(table)
   }
 }
 
 func (self *Handa) ensureIndexExists(table string, column string) {
   if !self.schema[table].index[column] {
-    self.mysqlQuery(`CREATE UNIQUE INDEX %s ON %s (%s)`, column, table, column)
+    self.withTableCacheOff(func() {
+      self.mysqlQuery(`CREATE UNIQUE INDEX %s ON %s (%s)`, column, table, column)
+    })
     self.schema[table] = self.loadTableInfo(table)
   }
 }
