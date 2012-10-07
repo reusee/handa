@@ -113,12 +113,15 @@ func TestBatchCursor(t *testing.T) {
 }
 
 func TestBatchComparison(t *testing.T) {
-  n := 300
+  n := 20
   db := getDb()
 
   startTime := time.Now()
   for i := 0; i < n; i++ {
-    db.Insert("thread", "tid", rand.Int63(), "subject,ccc,float,collect", "comp no batch", rand.Int31(), rand.Float64(), true)
+    err := db.Insert("thread", "tid", rand.Int63(), "subject,ccc,float,collect", "comp no batch", rand.Int31(), rand.Float64(), true)
+    if err != nil {
+      t.Fail()
+    }
   }
   fmt.Printf("Not batch %v\n", time.Now().Sub(startTime))
 
@@ -127,7 +130,15 @@ func TestBatchComparison(t *testing.T) {
   for i := 0; i < n; i++ {
     c.Insert("thread", "tid", rand.Int63(), "subject,ccc,float,collect", "comp batch", rand.Int31(), rand.Float64(), true)
   }
-  c.Commit()
+  res, err := c.Commit()
+  if err != nil {
+    t.Fail()
+  }
+  for _, r := range res {
+    if r.Err != nil {
+      t.Fail()
+    }
+  }
   fmt.Printf("Batch %v\n", time.Now().Sub(startTime))
 
   startTime = time.Now()
@@ -136,7 +147,10 @@ func TestBatchComparison(t *testing.T) {
     wg.Add(1)
     go func() {
       defer wg.Done()
-      db.Insert("thread", "tid", rand.Int63(), "subject,ccc,float,collect", "comp conn", rand.Int31(), rand.Float64(), true)
+      err := db.Insert("thread", "tid", rand.Int63(), "subject,ccc,float,collect", "comp conn", rand.Int31(), rand.Float64(), true)
+      if err != nil {
+        t.Fail()
+      }
     }()
   }
   wg.Wait()

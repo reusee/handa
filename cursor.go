@@ -78,9 +78,37 @@ func (self *Cursor) InsertUpdate(table string, index string, key interface{}, fi
   return
 }
 
-func (self *Cursor) Commit() {
+func (self *Cursor) Commit() ([]Result, error) {
   if !self.isValid { panic("Using an invalid cursor") }
-  if !self.isBatch { return }
-  self.conn.Commit() //TODO return result set
+  if !self.isBatch { return nil, nil }
+  res, err := self.conn.Commit()
+  if err != nil {
+    return nil, err
+  }
+  ret := make([]Result, len(res))
+  for i, r := range res {
+    switch r.T {
+    case tdh.INSERT:
+      ret[i] = Result{INSERT, r.Change, r.Count, r.Err}
+    case tdh.UPDATE:
+      ret[i] = Result{UPDATE, r.Change, r.Count, r.Err}
+    case tdh.DELETE:
+      ret[i] = Result{DELETE, r.Change, r.Count, r.Err}
+    }
+  }
   self.end <- true
+  return ret, nil
 }
+
+type Result struct {
+  T int
+  Change int
+  Count int
+  Err error
+}
+
+const (
+  INSERT = iota
+  UPDATE
+  DELETE
+)
