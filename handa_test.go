@@ -92,3 +92,40 @@ func BenchmarkInsertUpdate(b *testing.B) {
     db.InsertUpdate("thread", "tid", time.Now().UnixNano(), "subject,ccc,float,collect", "好！", rand.Int31(), rand.Float64(), true)
   }
 }
+
+func BenchmarkBatchInsertUpdate(b *testing.B) {
+  b.StopTimer()
+  db := getDb()
+  c := db.Batch()
+  b.StartTimer()
+  for i := 0; i < b.N; i++ {
+    c.InsertUpdate("thread", "tid", time.Now().UnixNano(), "subject,ccc,float,collect", "batch好！", rand.Int31(), rand.Float64(), true)
+  }
+  c.Commit()
+}
+
+func TestBatchCursor(t *testing.T) {
+  db := getDb()
+  c := db.Batch()
+  c.Insert("thread", "tid", rand.Int63(), "subject", "insert in batch")
+  c.Commit()
+}
+
+func TestBatchComparison(t *testing.T) {
+  n := 300
+  db := getDb()
+
+  startTime := time.Now()
+  for i := 0; i < n; i++ {
+    db.Insert("thread", "tid", rand.Int63(), "subject,ccc,float,collect", "comp no batch", rand.Int31(), rand.Float64(), true)
+  }
+  fmt.Printf("Not batch %v\n", time.Now().Sub(startTime))
+
+  c := db.Batch()
+  startTime = time.Now()
+  for i := 0; i < n; i++ {
+    c.Insert("thread", "tid", rand.Int63(), "subject,ccc,float,collect", "comp batch", rand.Int31(), rand.Float64(), true)
+  }
+  c.Commit()
+  fmt.Printf("Batch %v\n", time.Now().Sub(startTime))
+}

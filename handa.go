@@ -106,14 +106,6 @@ func (self *Handa) mysqlQuery(sql string, args ...interface{}) ([]mysql.Row, mys
   return conn.Query(sql, args...)
 }
 
-func (self *Handa) withSocket(fun func(*tdh.Conn)) {
-  socket := <-self.socketConnPool
-  defer func() {
-    self.socketConnPool <- socket
-  }()
-  fun(socket)
-}
-
 func (self *Handa) checkSchema(table string, index string, key interface{}, fieldList string, values ...interface{}) (string, []string, []string) {
   self.ensureTableExists(table)
   keyStr, t, _ := convertToString(key)
@@ -181,28 +173,49 @@ func (self *Handa) ensureIndexExists(table string, column string) {
   }
 }
 
-func (self *Handa) C() *Cursor {
-  return &Cursor{
+func (self *Handa) NewCursor(isBatch bool) *Cursor {
+  cursor := &Cursor{
     isValid: true,
     handa: self,
-    isBatch: false,
+    isBatch: isBatch,
+    end: make(chan bool, 1),
   }
+  init := make(chan bool, 1)
+  go func() {
+    conn := <-self.socketConnPool
+    defer func() {
+      self.socketConnPool <- conn
+    }()
+    cursor.conn = conn
+    if cursor.isBatch {
+      cursor.conn.Batch()
+    }
+    init <- true
+    <-cursor.end
+    cursor.isValid = false
+  }()
+  <-init
+  return cursor
+}
+
+func (self *Handa) Batch() *Cursor {
+  return self.NewCursor(true)
 }
 
 func (self *Handa) Update(table string, index string, key interface{}, fieldList string, values ...interface{}) (count int, change int, err error) {
-  return self.C().Update(table, index, key, fieldList, values...)
+  return self.NewCursor(false).Update(table, index, key, fieldList, values...)
 }
 
 func (self *Handa) Insert(table string, index string, key interface{}, fieldList string, values ...interface{}) (err error) {
-  return self.C().Insert(table, index, key, fieldList, values...)
+  return self.NewCursor(false).Insert(table, index, key, fieldList, values...)
 }
 
 func (self *Handa) InsertUpdate(table string, index string, key interface{}, fieldList string, values ...interface{}) (err error) {
-  return self.C().InsertUpdate(table, index, key, fieldList, values...)
+  return self.NewCursor(false).InsertUpdate(table, index, key, fieldList, values...)
 }
 
 func (self *Handa) UpdateInsert(table string, index string, key interface{}, fieldList string, values ...interface{}) (err error) {
-  return self.C().UpdateInsert(table, index, key, fieldList, values...)
+  return self.NewCursor(false).UpdateInsert(table, index, key, fieldList, values...)
 }
 
 func fatal(format string, args ...interface{}) {
