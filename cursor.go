@@ -41,6 +41,7 @@ func (self *Cursor) Insert(table string, index string, key interface{}, fieldLis
 
 func (self *Cursor) UpdateInsert(table string, index string, key interface{}, fieldList string, values ...interface{}) (err error) {
   if !self.isValid { panic("Using an invalid cursor") }
+  if self.isBatch { panic("Not permit in batch mode") }
   if !self.isBatch { defer func() {
     self.end <- true
   }()}
@@ -65,6 +66,7 @@ func (self *Cursor) UpdateInsert(table string, index string, key interface{}, fi
 
 func (self *Cursor) InsertUpdate(table string, index string, key interface{}, fieldList string, values ...interface{}) (err error) {
   if !self.isValid { panic("Using an invalid cursor") }
+  if self.isBatch { panic("Not permit in batch mode") }
   if !self.isBatch { defer func() {
     self.end <- true
   }()}
@@ -119,6 +121,7 @@ const (
 
 func (self *Cursor) getRows(table string, index string, fields []string, filterStrs []string) ([][][]byte, error) {
   if !self.isValid { panic("Using an invalid cursor") }
+  if self.isBatch { panic("Not permit in batch mode") }
   if !self.isBatch { defer func() {
     self.end <- true
   }()}
