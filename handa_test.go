@@ -167,3 +167,14 @@ func TestGetCol(t *testing.T) {
     t.Fail()
   }
 }
+
+func TestGetMap(t *testing.T) {
+  db := getDb()
+  res, err := db.GetMap("thread", "tid", "collect")
+  if err != nil {
+    t.Fail()
+  }
+  if !(len(res) > 0) {
+    t.Fail()
+  }
+}

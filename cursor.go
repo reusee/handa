@@ -132,3 +132,21 @@ func (self *Cursor) GetCol(table string, index string) ([]string, error) {
   }
   return ret, nil
 }
+
+func (self *Cursor) GetMap(table string, index string, field string) (map[string]string, error) {
+  if !self.isValid { panic("Using an invalid cursor") }
+  if !self.isBatch { defer func() {
+    self.end <- true
+  }()}
+  self.handa.ensureIndexExists(table, index)
+  rows, _, err := self.conn.Get(self.handa.dbname, table, index, []string{index, field},
+    [][]string{[]string{"(null)"}}, tdh.GT, 0, 0, nil)
+  if err != nil {
+    return nil, err
+  }
+  ret := make(map[string]string)
+  for _, row := range rows {
+    ret[string(row[0])] = string(row[1])
+  }
+  return ret, nil
+}

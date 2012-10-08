@@ -19,3 +19,7 @@ func (self *Handa) UpdateInsert(table string, index string, key interface{}, fie
 func (self *Handa) GetCol(table string, index string) ([]string, error) {
   return self.NewCursor(false).GetCol(table, index)
 }
+
+func (self *Handa) GetMap(table string, index string, field string) (map[string]string, error) {
+  return self.NewCursor(false).GetMap(table, index, field)
+}
