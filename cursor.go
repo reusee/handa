@@ -188,7 +188,7 @@ func (self *Cursor) GetFilteredMap(table string, index string, field string, fil
 
 func convertFilterStrings(strs []string) (out []tdh.Filter, err error) {
   out = make([]tdh.Filter, len(strs))
-  expPat, _ := regexp.Compile("(.*)(=|>=|<=|>|<|!=)(.*)")
+  expPat, _ := regexp.Compile("([^=><!]*)(=|>=|<=|>|<|!=)(.*)")
   for i, s := range strs {
     matches := expPat.FindAllStringSubmatch(s, len(s))
     if len(matches) < 0 || len(matches[0]) < 4 {
