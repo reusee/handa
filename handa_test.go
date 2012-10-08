@@ -7,6 +7,7 @@ import (
   "fmt"
   tdh "github.com/reusee/go-tdhsocket"
   "sync"
+  "strconv"
 )
 
 func getDb() *Handa {
@@ -176,5 +177,23 @@ func TestGetMap(t *testing.T) {
   }
   if !(len(res) > 0) {
     t.Fail()
+  }
+}
+
+func TestGetFilteredCol(t *testing.T) {
+  db := getDb()
+  res, err := db.GetFilteredCol("thread", "tid", "tid>50")
+  if err != nil {
+    fmt.Printf("%s\n", err)
+    t.Fail()
+  }
+  if !(len(res) > 0) {
+    t.Fail()
+  }
+  for _, r := range res {
+    tid, _ := strconv.Atoi(r)
+    if tid <= 50 {
+      t.Fail()
+    }
   }
 }

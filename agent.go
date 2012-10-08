@@ -20,6 +20,10 @@ func (self *Handa) GetCol(table string, index string) ([]string, error) {
   return self.NewCursor(false).GetCol(table, index)
 }
 
+func (self *Handa) GetFilteredCol(table string, index string, filters ...string) ([]string, error) {
+  return self.NewCursor(false).GetFilteredCol(table, index, filters...)
+}
+
 func (self *Handa) GetMap(table string, index string, field string) (map[string]string, error) {
   return self.NewCursor(false).GetMap(table, index, field)
 }

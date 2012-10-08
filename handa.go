@@ -13,8 +13,8 @@ import (
 )
 
 var (
-  MysqlConnPoolSize = 5
-  SocketConnPoolSize = 30
+  MysqlConnPoolSize = 16
+  SocketConnPoolSize = 64
 )
 
 type Handa struct {

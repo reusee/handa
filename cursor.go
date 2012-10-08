@@ -2,6 +2,8 @@ package handa
 
 import (
   tdh "github.com/reusee/go-tdhsocket"
+  "regexp"
+  "errors"
 )
 
 type Cursor struct {
@@ -113,14 +115,22 @@ const (
   DELETE
 )
 
-func (self *Cursor) GetCol(table string, index string) ([]string, error) {
+func (self *Cursor) getCol(table string, index string, filterStrs []string) ([]string, error) {
   if !self.isValid { panic("Using an invalid cursor") }
   if !self.isBatch { defer func() {
     self.end <- true
   }()}
   self.handa.ensureIndexExists(table, index)
+  var filters []tdh.Filter
+  var err error
+  if filterStrs != nil {
+    filters, err = convertFilterStrings(filterStrs)
+    if err != nil {
+      return nil, err
+    }
+  }
   rows, _, err := self.conn.Get(self.handa.dbname, table, index, []string{index},
-    [][]string{[]string{"(null)"}}, tdh.GT, 0, 0, nil)
+    [][]string{[]string{"(null)"}}, tdh.GT, 0, 0, filters)
   if err != nil {
     return nil, err
   }
@@ -131,6 +141,14 @@ func (self *Cursor) GetCol(table string, index string) ([]string, error) {
     }
   }
   return ret, nil
+}
+
+func (self *Cursor) GetCol(table string, index string) ([]string, error) {
+  return self.getCol(table, index, nil)
+}
+
+func (self *Cursor) GetFilteredCol(table string, index string, filters ...string) ([]string, error) {
+  return self.getCol(table, index, filters)
 }
 
 func (self *Cursor) GetMap(table string, index string, field string) (map[string]string, error) {
@@ -149,4 +167,32 @@ func (self *Cursor) GetMap(table string, index string, field string) (map[string
     ret[string(row[0])] = string(row[1])
   }
   return ret, nil
+}
+
+func convertFilterStrings(strs []string) (out []tdh.Filter, err error) {
+  out = make([]tdh.Filter, len(strs))
+  expPat, _ := regexp.Compile("(.*)(=|>=|<=|>|<|!=)(.*)")
+  for i, s := range strs {
+    matches := expPat.FindAllStringSubmatch(s, len(s))
+    if len(matches) < 0 || len(matches[0]) < 4 {
+      return nil, errors.New("filter invalid: " + s)
+    }
+    var op uint8
+    switch matches[0][2] {
+    case "=":
+      op = tdh.FILTER_EQ
+    case ">=":
+      op = tdh.FILTER_GE
+    case "<=":
+      op = tdh.FILTER_LE
+    case ">":
+      op = tdh.FILTER_GT
+    case "<":
+      op = tdh.FILTER_LT
+    case "!=":
+      op = tdh.FILTER_NOT
+    }
+    out[i] = tdh.Filter{matches[0][1], op, matches[0][3]}
+  }
+  return
 }
