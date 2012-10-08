@@ -213,3 +213,21 @@ func TestGetFilteredMap(t *testing.T) {
     }
   }
 }
+
+func TestDDLWhenBatch(t *testing.T) {
+  db := getDb()
+  n := rand.Int31()
+  b := db.Batch()
+  for i := 0; i < 10; i++ {
+    b.Insert("thread", "tid", rand.Int63(), "foo_" + strconv.Itoa(int(n)), "OK")
+  }
+  res, err := b.Commit()
+  if err != nil {
+    t.Fail()
+  }
+  for _, r := range res {
+    if r.Err != nil {
+      t.Fail()
+    }
+  }
+}
