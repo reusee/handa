@@ -115,7 +115,9 @@ const (
   DELETE
 )
 
-func (self *Cursor) getCol(table string, index string, filterStrs []string) ([]string, error) {
+// get
+
+func (self *Cursor) getRows(table string, index string, fields []string, filterStrs []string) ([][][]byte, error) {
   if !self.isValid { panic("Using an invalid cursor") }
   if !self.isBatch { defer func() {
     self.end <- true
@@ -129,8 +131,19 @@ func (self *Cursor) getCol(table string, index string, filterStrs []string) ([]s
       return nil, err
     }
   }
-  rows, _, err := self.conn.Get(self.handa.dbname, table, index, []string{index},
+  //TODO keys和op也应为参数
+  rows, _, err := self.conn.Get(self.handa.dbname, table, index, fields,
     [][]string{[]string{"(null)"}}, tdh.GT, 0, 0, filters)
+  if err != nil {
+    return nil, err
+  }
+  return rows, nil
+}
+
+// get col
+
+func (self *Cursor) getCol(table string, index string, filterStrs []string) ([]string, error) {
+  rows, err := self.getRows(table, index, []string{index}, filterStrs)
   if err != nil {
     return nil, err
   }
@@ -151,14 +164,10 @@ func (self *Cursor) GetFilteredCol(table string, index string, filters ...string
   return self.getCol(table, index, filters)
 }
 
-func (self *Cursor) GetMap(table string, index string, field string) (map[string]string, error) {
-  if !self.isValid { panic("Using an invalid cursor") }
-  if !self.isBatch { defer func() {
-    self.end <- true
-  }()}
-  self.handa.ensureIndexExists(table, index)
-  rows, _, err := self.conn.Get(self.handa.dbname, table, index, []string{index, field},
-    [][]string{[]string{"(null)"}}, tdh.GT, 0, 0, nil)
+// get map
+
+func (self *Cursor) getMap(table string, index string, field string, filterStrs []string) (map[string]string, error) {
+  rows, err := self.getRows(table, index, []string{index, field}, filterStrs)
   if err != nil {
     return nil, err
   }
@@ -167,6 +176,14 @@ func (self *Cursor) GetMap(table string, index string, field string) (map[string
     ret[string(row[0])] = string(row[1])
   }
   return ret, nil
+}
+
+func (self *Cursor) GetMap(table string, index string, field string) (map[string]string, error) {
+  return self.getMap(table, index, field, nil)
+}
+
+func (self *Cursor) GetFilteredMap(table string, index string, field string, filters ...string) (map[string]string, error) {
+  return self.getMap(table, index, field, filters)
 }
 
 func convertFilterStrings(strs []string) (out []tdh.Filter, err error) {

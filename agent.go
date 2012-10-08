@@ -27,3 +27,7 @@ func (self *Handa) GetFilteredCol(table string, index string, filters ...string)
 func (self *Handa) GetMap(table string, index string, field string) (map[string]string, error) {
   return self.NewCursor(false).GetMap(table, index, field)
 }
+
+func (self *Handa) GetFilteredMap(table string, index string, field string, filters ...string) (map[string]string, error) {
+  return self.NewCursor(false).GetFilteredMap(table, index, field, filters...)
+}

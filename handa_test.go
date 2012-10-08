@@ -182,7 +182,7 @@ func TestGetMap(t *testing.T) {
 
 func TestGetFilteredCol(t *testing.T) {
   db := getDb()
-  res, err := db.GetFilteredCol("thread", "tid", "tid>50")
+  res, err := db.GetFilteredCol("thread", "tid", "tid>50", "collect=0")
   if err != nil {
     fmt.Printf("%s\n", err)
     t.Fail()
@@ -193,6 +193,22 @@ func TestGetFilteredCol(t *testing.T) {
   for _, r := range res {
     tid, _ := strconv.Atoi(r)
     if tid <= 50 {
+      t.Fail()
+    }
+  }
+}
+
+func TestGetFilteredMap(t *testing.T) {
+  db := getDb()
+  res, err := db.GetFilteredMap("thread", "tid", "collect", "collect=0")
+  if err != nil {
+    t.Fail()
+  }
+  if !(len(res) > 0) {
+    t.Fail()
+  }
+  for _, v := range res {
+    if v != "0" {
       t.Fail()
     }
   }
