@@ -58,6 +58,7 @@ func New(host string, port string, user string, password string, database string
 }
 
 func (self *Handa) loadTableInfo(tableName string) *TableInfo {
+  //TODO load hash column info
   tableInfo := &TableInfo{
     name: tableName,
     columnType: make(map[string]int),
@@ -165,6 +166,7 @@ func (self *Handa) ensureColumnExists(table string, column string, t int) {
 }
 
 func (self *Handa) ensureIndexExists(table string, column string) {
+  //TODO deal with text type index column
   if !self.schema[table].index[column] {
     self.withTableCacheOff(func() {
       self.mysqlQuery(`CREATE UNIQUE INDEX %s ON %s (%s)`, column, table, column)

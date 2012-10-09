@@ -10,19 +10,15 @@ import (
   "strconv"
 )
 
-func getDb() *Handa {
-  db := New("localhost", "3306", "test", "ffffff", "test", "45678")
+var db *Handa
+
+func TestInit(t *testing.T) {
+  db = New("localhost", "3306", "test", "ffffff", "test", "45678")
   fmt.Printf("")
   rand.Seed(time.Now().UnixNano())
-  return db
-}
-
-func TestNew(t *testing.T) {
-  getDb()
 }
 
 func TestUpdate(t *testing.T) {
-  db := getDb()
   count, change, err := db.Update("thread", "tid", 432142314, "collect", true)
   if err != nil {
     t.Fail()
@@ -33,7 +29,6 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestInsert(t *testing.T) {
-  db := getDb()
   for i := 0; i < 10; i++ {
     n := rand.Int63()
     err := db.Insert("thread", "tid", n, "collect", true)
@@ -51,7 +46,6 @@ func TestInsert(t *testing.T) {
 }
 
 func TestUpdateInsert(t *testing.T) {
-  db := getDb()
   err := db.UpdateInsert("thread", "tid", 15, "collect", true)
   if err != nil { t.Fail() }
   err = db.UpdateInsert("thread", "tid", 16, "collect", true)
@@ -70,7 +64,6 @@ func TestUpdateInsert(t *testing.T) {
 }
 
 func TestInsertUpdate(t *testing.T) {
-  db := getDb()
   n := rand.Int63()
   db.Insert("thread", "tid", n, "subject", "OK")
   db.InsertUpdate("thread", "tid", n, "subject", "YES")
@@ -78,18 +71,12 @@ func TestInsertUpdate(t *testing.T) {
 }
 
 func BenchmarkUpdateInsert(b *testing.B) {
-  b.StopTimer()
-  db := getDb()
-  b.StartTimer()
   for i := 0; i < b.N; i++ {
     db.UpdateInsert("thread", "tid", time.Now().UnixNano(), "subject,ccc,float,collect", "好！", rand.Int31(), rand.Float64(), true)
   }
 }
 
 func BenchmarkInsertUpdate(b *testing.B) {
-  b.StopTimer()
-  db := getDb()
-  b.StartTimer()
   for i := 0; i < b.N; i++ {
     db.InsertUpdate("thread", "tid", time.Now().UnixNano(), "subject,ccc,float,collect", "好！", rand.Int31(), rand.Float64(), true)
   }
@@ -97,7 +84,6 @@ func BenchmarkInsertUpdate(b *testing.B) {
 
 func BenchmarkBatchInsertUpdate(b *testing.B) {
   b.StopTimer()
-  db := getDb()
   c := db.Batch()
   b.StartTimer()
   for i := 0; i < b.N; i++ {
@@ -107,7 +93,6 @@ func BenchmarkBatchInsertUpdate(b *testing.B) {
 }
 
 func TestBatchCursor(t *testing.T) {
-  db := getDb()
   c := db.Batch()
   c.Insert("thread", "tid", rand.Int63(), "subject", "insert in batch")
   c.Commit()
@@ -115,7 +100,6 @@ func TestBatchCursor(t *testing.T) {
 
 func TestBatchComparison(t *testing.T) {
   n := 20
-  db := getDb()
 
   startTime := time.Now()
   for i := 0; i < n; i++ {
@@ -159,7 +143,6 @@ func TestBatchComparison(t *testing.T) {
 }
 
 func TestGetCol(t *testing.T) {
-  db := getDb()
   res, err := db.GetCol("thread", "tid")
   if err != nil {
     t.Fail()
@@ -170,7 +153,6 @@ func TestGetCol(t *testing.T) {
 }
 
 func TestGetMap(t *testing.T) {
-  db := getDb()
   res, err := db.GetMap("thread", "tid", "collect")
   if err != nil {
     t.Fail()
@@ -181,7 +163,6 @@ func TestGetMap(t *testing.T) {
 }
 
 func TestGetFilteredCol(t *testing.T) {
-  db := getDb()
   res, err := db.GetFilteredCol("thread", "tid", "tid>50", "collect=0")
   if err != nil {
     fmt.Printf("%s\n", err)
@@ -199,7 +180,6 @@ func TestGetFilteredCol(t *testing.T) {
 }
 
 func TestGetFilteredMap(t *testing.T) {
-  db := getDb()
   res, err := db.GetFilteredMap("thread", "tid", "collect", "collect=0")
   if err != nil {
     t.Fail()
@@ -215,7 +195,6 @@ func TestGetFilteredMap(t *testing.T) {
 }
 
 func TestDDLWhenBatch(t *testing.T) {
-  db := getDb()
   n := rand.Int31()
   b := db.Batch()
   for i := 0; i < 10; i++ {
@@ -230,4 +209,7 @@ func TestDDLWhenBatch(t *testing.T) {
       t.Fail()
     }
   }
+}
+
+func TestTextTypeIndex(t *testing.T) {
 }

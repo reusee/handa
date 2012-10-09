@@ -16,6 +16,7 @@ type Cursor struct {
 }
 
 func (self *Cursor) Update(table string, index string, key interface{}, fieldList string, values ...interface{}) (count int, change int, err error) {
+  //TODO deal with hash columns
   if !self.isValid { panic("Using an invalid cursor") }
   if !self.isBatch { defer func() {
     self.end <- true
@@ -30,6 +31,7 @@ func (self *Cursor) Update(table string, index string, key interface{}, fieldLis
 }
 
 func (self *Cursor) Insert(table string, index string, key interface{}, fieldList string, values ...interface{}) (err error) {
+  //TODO deal with hash columns
   if !self.isValid { panic("Using an invalid cursor") }
   if !self.isBatch { defer func() {
     self.end <- true
@@ -40,6 +42,7 @@ func (self *Cursor) Insert(table string, index string, key interface{}, fieldLis
 }
 
 func (self *Cursor) UpdateInsert(table string, index string, key interface{}, fieldList string, values ...interface{}) (err error) {
+  //TODO deal with hash columns
   if !self.isValid { panic("Using an invalid cursor") }
   if self.isBatch { panic("Not permit in batch mode") }
   if !self.isBatch { defer func() {
@@ -65,6 +68,7 @@ func (self *Cursor) UpdateInsert(table string, index string, key interface{}, fi
 }
 
 func (self *Cursor) InsertUpdate(table string, index string, key interface{}, fieldList string, values ...interface{}) (err error) {
+  //TODO deal with hash columns
   if !self.isValid { panic("Using an invalid cursor") }
   if self.isBatch { panic("Not permit in batch mode") }
   if !self.isBatch { defer func() {
