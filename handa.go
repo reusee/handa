@@ -113,6 +113,9 @@ func (self *Handa) checkSchema(table string, index string, key interface{}, fiel
   self.ensureColumnExists(table, index, t)
   self.ensureIndexExists(table, index)
   fields := strings.Split(fieldList, ",")
+  if len(fields) == 1 && fields[0] == "" {
+    fields = nil
+  }
   valueStrs := make([]string, len(values))
   for i, field := range fields {
     fields[i] = strings.TrimSpace(field)

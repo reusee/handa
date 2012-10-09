@@ -211,5 +211,11 @@ func TestDDLWhenBatch(t *testing.T) {
   }
 }
 
+func TestEmptyFieldList(t *testing.T) {
+  db.Insert("thread", "tid", rand.Int63(), "")
+}
+
 func TestTextTypeIndex(t *testing.T) {
+  tablename := fmt.Sprintf("test_%d", rand.Int31())
+  db.Insert(tablename, "textcol", "TEXT", "")
 }
