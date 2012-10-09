@@ -75,7 +75,7 @@ func (self *Handa) loadTableInfo(tableName string) *TableInfo {
       tableInfo.columnType[columnName] = ColTypeInt
     case "double":
       tableInfo.columnType[columnName] = ColTypeFloat
-    case "longblob":
+    case "longtext", "longblob":
       tableInfo.columnType[columnName] = ColTypeString
     }
     if columnKeyType == "UNI" {
@@ -155,7 +155,7 @@ func (self *Handa) ensureColumnExists(table string, column string, t int) {
     case ColTypeFloat:
       columnType = "DOUBLE"
     case ColTypeString:
-      columnType = "LONGBLOB"
+      columnType = "LONGTEXT"
     }
     self.withTableCacheOff(func() {
       self.mysqlQuery("ALTER TABLE `%s` ADD (`%s` %s NULL DEFAULT NULL)", table, column, columnType)
