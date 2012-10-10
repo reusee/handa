@@ -59,7 +59,6 @@ func New(host string, port string, user string, password string, database string
 }
 
 func (self *Handa) loadTableInfo(tableName string) *TableInfo {
-  //TODO load multiple column unique keys
   tableInfo := &TableInfo{
     name: tableName,
     columnType: make(map[string]int),
@@ -69,7 +68,6 @@ func (self *Handa) loadTableInfo(tableName string) *TableInfo {
   for _, c := range r {
     columnName := c.Str(0)
     columnType := c.Str(1)
-    columnKeyType := c.Str(3)
     switch columnType {
     case "tinyint(1)":
       tableInfo.columnType[columnName] = ColTypeBool
@@ -82,8 +80,13 @@ func (self *Handa) loadTableInfo(tableName string) *TableInfo {
     case "char(32)":
       tableInfo.columnType[columnName] = ColTypeHash
     }
-    if columnKeyType == "UNI" {
-      tableInfo.index[columnName] = true
+  }
+  r, _, _ = self.mysqlQuery("SHOW INDEXES IN %s", tableName)
+  for _, c := range r { // load unique keys
+    isUnique := c.Int(1) == 0
+    keyName := c.Str(2)
+    if isUnique {
+      tableInfo.index[keyName] = true
     }
   }
   return tableInfo
@@ -112,7 +115,7 @@ func (self *Handa) mysqlQuery(sql string, args ...interface{}) ([]mysql.Row, mys
 }
 
 func (self *Handa) checkSchemaAndConvertData(table string, indexesStr string, keys interface{},
-  fieldList string, values ...interface{}) (dbIndex string, 
+  fieldList string, values ...interface{}) (dbIndex string,
   dbIndexStrs []string, dbKeys []string,
   indexStrs []string, keyStrs []string,
   dbFields []string, dbValues []string) {
@@ -122,31 +125,40 @@ func (self *Handa) checkSchemaAndConvertData(table string, indexesStr string, ke
 
   // index and key
   // split indexes
-  // convert keys to string
-  // ensure key columns exists
-  // ensure index exists
-
   indexStrs = strings.Split(indexesStr, ",")
   for i, indexStr := range indexStrs {
     indexStrs[i] = strings.TrimSpace(indexStr)
   }
-  dbKeys = make([]string, 0)
-  keyStrs = make([]string, 0)
-  dbIndexStrs = make([]string, 0)
-  if len(indexStrs) == 1 {
-    keyStr, t := convertToString(keys)
-    dbKey := keyStr
-    index := indexStrs[0]
-    self.ensureColumnExists(table, index, t)
-    var isString []bool
-    dbIndex, isString = self.ensureIndexExists(table, index)
-    if isString[0] {
-      dbKey = mmh3Hex(dbKey)
+  var keyList []interface{}
+  if len(indexStrs) > 1 {
+    keyList, _ = keys.([]interface{})
+  } else {
+    keyList = []interface{}{keys}
+  }
+  if len(keyList) != len(indexStrs) {
+    log.Fatal("index and key not match in number")
+  }
+  // convert keys to string
+  // ensure key columns exists
+  keyStrs = make([]string, len(keyList))
+  for i, key := range keyList {
+    keyStr, t := convertToString(key)
+    keyStrs[i] = keyStr
+    self.ensureColumnExists(table, indexStrs[i], t)
+  }
+  // ensure index exists
+  var isString []bool
+  dbIndex, isString = self.ensureIndexExists(table, indexStrs...)
+  dbKeys = make([]string, len(keyList))
+  dbIndexStrs = make([]string, len(keyList))
+  for i, index := range indexStrs {
+    if isString[i] {
+      dbIndexStrs[i] = "hash_" + index
+      dbKeys[i] = mmh3Hex(keyStrs[i])
+    } else {
+      dbIndexStrs[i] = index
+      dbKeys[i] = keyStrs[i]
     }
-    dbKeys = append(dbKeys, dbKey)
-    keyStrs = append(keyStrs, keyStr)
-    dbIndexStrs = append(dbIndexStrs, dbIndex)
-  } else { // multiple column index
   }
 
   // fields and values
@@ -262,7 +274,7 @@ func (self *Handa) ensureIndexExists(table string, columns ...string) (indexName
       _, _, err := self.mysqlQuery("CREATE UNIQUE INDEX `%s` ON `%s` (%s)",
         indexName, table, strings.Join(quotedColumns, ","))
       if err != nil {
-        log.Fatal("index creation error: %s", err)
+        log.Fatal("table ", table, " index creation error ", err)
       }
     })
     self.schema[table] = self.loadTableInfo(table)

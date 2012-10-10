@@ -294,6 +294,20 @@ func TestHashColumnUpdate(t *testing.T) {
 }
 
 func TestMultiColumnIndex(t *testing.T) {
-  db.Insert("price", "itemid, time", []interface{}{1, 20121009}, "price", 5.5)
-  db.Insert("price", "itemid, time", []interface{}{1, 20121008}, "price", 5.5)
+  err := db.InsertUpdate("price", "itemid, time", []interface{}{1, 20121009}, "price", 5.5)
+  if err != nil {
+    t.Fatal(err)
+  }
+  err = db.InsertUpdate("price", "itemid, time", []interface{}{1, 20121008}, "price", 6.5)
+  if err != nil {
+    t.Fatal(err)
+  }
+  cols, err := db.GetFilteredCol("price", "price", "itemid=1", "time=20121009")
+  if len(cols) != 1 || cols[0] != "5.5" {
+    t.Fail()
+  }
+  cols, err = db.GetFilteredCol("price", "price", "itemid=1", "time=20121008")
+  if len(cols) != 1 || cols[0] != "6.5" {
+    t.Fail()
+  }
 }
