@@ -65,15 +65,21 @@ func TestUpdateInsert(t *testing.T) {
 
 func TestInsertUpdate(t *testing.T) {
   n := rand.Int63()
-  db.Insert("thread", "tid", n, "subject", "OK")
-  db.InsertUpdate("thread", "tid", n, "subject", "YES")
+  err := db.Insert("thread", "tid", n, "subject", "OK")
+  if err != nil {
+    t.Fatal("insert error: %s", err)
+  }
+  err = db.InsertUpdate("thread", "tid", n, "subject", "YES")
+  if err != nil {
+    t.Fatal("InsertUpdate error: %s", err)
+  }
   nStr := fmt.Sprintf("%d", n)
   m, err := db.GetFilteredMap("thread", "tid", "subject", "tid=" + nStr)
   if err != nil {
-    t.Fail()
+    t.Fatal("get filtered map error: %s", err)
   }
   if m[nStr] != "YES" {
-    t.Fail()
+    t.Fatal("update fail")
   }
 }
 
@@ -256,7 +262,7 @@ func TestTextIndexUpdate(t *testing.T) {
     t.Fatal("update operation error")
   }
   if count != 1 || change != 1 {
-    t.Fatal("update fail")
+    t.Fatal("update fail: %s", table)
   }
 }
 
@@ -286,3 +292,8 @@ func TestHashColumnUpdate(t *testing.T) {
     t.Fatal("not update")
   }
 }
+
+//func TestMultiColumnIndex(t *testing.T) {
+//  db.Insert("price", "itemid, time", []interface{}{1, 20121009}, "price", 5.5)
+//  db.Insert("price", "itemid, time", []interface{}{1, 20121008}, "price", 5.5)
+//}

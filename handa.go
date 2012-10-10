@@ -110,21 +110,36 @@ func (self *Handa) mysqlQuery(sql string, args ...interface{}) ([]mysql.Row, mys
   return conn.Query(sql, args...)
 }
 
-func (self *Handa) checkSchemaAndConvertData(table string, index string, key interface{}, 
-  fieldList string, values ...interface{}) (dbIndex string, dbKey string, keyStr string, dbFields []string, dbValues []string) {
-  var t int
+func (self *Handa) checkSchemaAndConvertData(table string, indexesStr string, keys interface{},
+  fieldList string, values ...interface{}) (dbIndex string, 
+  dbIndexStrs []string, dbKeys []string,
+  indexStrs []string, keyStrs []string,
+  dbFields []string, dbValues []string) {
 
   // table
   self.ensureTableExists(table)
 
   // index and key
-  keyStr, t = convertToString(key)
-  dbKey = keyStr
-  self.ensureColumnExists(table, index, t)
-  dbIndex = index
-  if self.ensureIndexExists(table, index) { //is string column
-    dbKey = mmh3Hex(dbKey)
-    dbIndex = "hash_" + index
+  indexStrs = strings.Split(indexesStr, ",")
+  for i, indexStr := range indexStrs {
+    indexStrs[i] = strings.TrimSpace(indexStr)
+  }
+  dbKeys = make([]string, 0)
+  keyStrs = make([]string, 0)
+  dbIndexStrs = make([]string, 0)
+  if len(indexStrs) == 1 {
+    keyStr, t := convertToString(keys)
+    dbKey := keyStr
+    self.ensureColumnExists(table, indexStrs[0], t)
+    dbIndex = indexStrs[0]
+    if self.ensureIndexExists(table, indexStrs[0]) {
+      dbKey = mmh3Hex(dbKey)
+      dbIndex = "hash_" + indexStrs[0]
+    }
+    dbKeys = append(dbKeys, dbKey)
+    keyStrs = append(keyStrs, keyStr)
+    dbIndexStrs = append(dbIndexStrs, dbIndex)
+  } else { // multiple column index
   }
 
   // fields and values
