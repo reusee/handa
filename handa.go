@@ -6,6 +6,7 @@ import (
   "strings"
 
   tdh "github.com/reusee/go-tdhsocket"
+  "github.com/reusee/mmh3"
 
   "github.com/ziutek/mymysql/autorc"
   "github.com/ziutek/mymysql/mysql"
@@ -58,7 +59,6 @@ func New(host string, port string, user string, password string, database string
 }
 
 func (self *Handa) loadTableInfo(tableName string) *TableInfo {
-  //TODO load hash column info
   tableInfo := &TableInfo{
     name: tableName,
     columnType: make(map[string]int),
@@ -78,6 +78,8 @@ func (self *Handa) loadTableInfo(tableName string) *TableInfo {
       tableInfo.columnType[columnName] = ColTypeFloat
     case "longtext", "longblob":
       tableInfo.columnType[columnName] = ColTypeString
+    case "char(32)":
+      tableInfo.columnType[columnName] = ColTypeHash
     }
     if columnKeyType == "UNI" {
       tableInfo.index[columnName] = true
@@ -91,6 +93,7 @@ const (
   ColTypeInt
   ColTypeFloat
   ColTypeString
+  ColTypeHash
 )
 
 type TableInfo struct {
@@ -111,7 +114,7 @@ func (self *Handa) checkSchema(table string, index string, key interface{}, fiel
   self.ensureTableExists(table)
   keyStr, t, _ := convertToString(key)
   self.ensureColumnExists(table, index, t)
-  self.ensureIndexExists(table, index)
+  isString := self.ensureIndexExists(table, index)
   fields := strings.Split(fieldList, ",")
   if len(fields) == 1 && fields[0] == "" {
     fields = nil
@@ -122,6 +125,10 @@ func (self *Handa) checkSchema(table string, index string, key interface{}, fiel
     valueStr, t, _ := convertToString(values[i])
     valueStrs[i] = valueStr
     self.ensureColumnExists(table, fields[i], t)
+  }
+  if isString { // calculate hash
+    fields = append(fields, "hash_" + index)
+    valueStrs = append(valueStrs, fmt.Sprintf("%x", mmh3.Hash128([]byte(keyStr))))
   }
   return keyStr, fields, valueStrs
 }
@@ -160,6 +167,8 @@ func (self *Handa) ensureColumnExists(table string, column string, t int) {
       columnType = "DOUBLE"
     case ColTypeString:
       columnType = "LONGTEXT"
+    case ColTypeHash:
+      columnType = "CHAR(32)"
     }
     self.withTableCacheOff(func() {
       self.mysqlQuery("ALTER TABLE `%s` ADD (`%s` %s NULL DEFAULT NULL)", table, column, columnType)
@@ -168,14 +177,22 @@ func (self *Handa) ensureColumnExists(table string, column string, t int) {
   }
 }
 
-func (self *Handa) ensureIndexExists(table string, column string) {
-  //TODO deal with text type index column
-  if !self.schema[table].index[column] {
+func (self *Handa) ensureIndexExists(table string, column string) (isString bool) {
+  indexColumnName := column
+  if self.schema[table].columnType[column] == ColTypeString {
+    indexColumnName = "hash_" + column
+    isString = true
+  }
+  if !self.schema[table].index[indexColumnName] {
+    if isString {
+      self.ensureColumnExists(table, indexColumnName, ColTypeHash)
+    }
     self.withTableCacheOff(func() {
-      self.mysqlQuery(`CREATE UNIQUE INDEX %s ON %s (%s)`, column, table, column)
+      self.mysqlQuery(`CREATE UNIQUE INDEX %s ON %s (%s)`, column, table, indexColumnName)
     })
     self.schema[table] = self.loadTableInfo(table)
   }
+  return
 }
 
 func (self *Handa) NewCursor(isBatch bool) *Cursor {

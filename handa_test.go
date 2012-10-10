@@ -216,6 +216,27 @@ func TestEmptyFieldList(t *testing.T) {
 }
 
 func TestTextTypeIndex(t *testing.T) {
-  tablename := fmt.Sprintf("test_%d", rand.Int31())
+  tablename := "test_" + strconv.Itoa(rand.Intn(10000))
+  fmt.Printf("%s\n", tablename)
+  err := db.Insert(tablename, "textcol", "TEXT", "")
+  if err != nil {
+    fmt.Printf("%s\n", err)
+    t.Fail()
+  }
   db.Insert(tablename, "textcol", "TEXT", "")
+  rows, _, _ := db.mysqlQuery("SELECT COUNT(*) FROM %s", tablename)
+  num := rows[0].Int(0)
+  if num != 1 {
+    t.Fail()
+  }
+
+  n := 30
+  for i := 0; i < n; i++ {
+    db.Insert(tablename, "textcol", strconv.Itoa(rand.Intn(2000000)), "")
+  }
+  rows, _, _ = db.mysqlQuery("SELECT COUNT(*) FROM %s", tablename)
+  num = rows[0].Int(0)
+  if num != n + 1 {
+    t.Fail()
+  }
 }
