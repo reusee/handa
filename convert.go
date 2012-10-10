@@ -4,7 +4,7 @@ import (
   "fmt"
 )
 
-func convertToString(in interface{}) (ret string, t int, err error) {
+func convertToString(in interface{}) (ret string, t int) {
   switch v := in.(type) {
   case bool:
     ret = "0"
@@ -54,5 +54,5 @@ func convertToString(in interface{}) (ret string, t int, err error) {
   default:
     panic("unknown type")
   }
-  return ret, t, err
+  return ret, t
 }

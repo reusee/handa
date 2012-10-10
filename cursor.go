@@ -20,18 +20,11 @@ func (self *Cursor) Update(table string, index string, key interface{}, fieldLis
   if !self.isBatch { defer func() {
     self.end <- true
   }()}
-  keyStr, keyHash, fields, valueStrs := self.handa.checkSchema(table, index, key, fieldList, values...)
-  if keyHash != "" {
-    keyStr = keyHash
-    index = "hash_" + index
-  }
-  count, change, err = self.conn.Update(self.handa.dbname, table, index,
-    fields,
-    [][]string{[]string{keyStr}}, tdh.EQ,
-    0, 0, nil, valueStrs)
-  if err != nil {
-    return
-  }
+  dbIndex, dbKey, _, dbFields, dbValues := self.handa.checkSchemaAndConvertData(table, index, key, fieldList, values...)
+  count, change, err = self.conn.Update(self.handa.dbname, table, dbIndex,
+    dbFields,
+    [][]string{[]string{dbKey}}, tdh.EQ,
+    0, 0, nil, dbValues)
   return
 }
 
@@ -40,14 +33,10 @@ func (self *Cursor) Insert(table string, index string, key interface{}, fieldLis
   if !self.isBatch { defer func() {
     self.end <- true
   }()}
-  keyStr, keyHash, fields, valueStrs := self.handa.checkSchema(table, index, key, fieldList, values...)
-  insertFields := append(fields, index)
-  insertValues := append(valueStrs, keyStr)
-  if keyHash != "" {
-    insertFields = append(insertFields, "hash_" + index)
-    insertValues = append(insertValues, keyHash)
-  }
-  err = self.conn.Insert(self.handa.dbname, table, index, insertFields, insertValues)
+  dbIndex, dbKey, keyStr, dbFields, dbValues := self.handa.checkSchemaAndConvertData(table, index, key, fieldList, values...)
+  err = self.conn.Insert(self.handa.dbname, table, dbIndex,
+    append(dbFields, index, dbIndex),
+    append(dbValues, keyStr, dbKey))
   return
 }
 
@@ -57,29 +46,19 @@ func (self *Cursor) UpdateInsert(table string, index string, key interface{}, fi
   if !self.isBatch { defer func() {
     self.end <- true
   }()}
-  keyStr, keyHash, fields, valueStrs := self.handa.checkSchema(table, index, key, fieldList, values...)
+  dbIndex, dbKey, keyStr, dbFields, dbValues := self.handa.checkSchemaAndConvertData(table, index, key, fieldList, values...)
   var count int
-  updateIndex := index
-  updateKeyStr := keyStr
-  if keyHash != "" {
-    updateIndex = "hash_" + index
-    updateKeyStr = keyHash
-  }
-  count, _, err = self.conn.Update(self.handa.dbname, table, updateIndex,
-    fields,
-    [][]string{[]string{updateKeyStr}}, tdh.EQ,
-    0, 0, nil, valueStrs)
+  count, _, err = self.conn.Update(self.handa.dbname, table, dbIndex,
+    dbFields,
+    [][]string{[]string{dbKey}}, tdh.EQ,
+    0, 0, nil, dbValues)
   if err != nil {
     return
   }
   if count == 0 { // not exists, then insert
-    insertFields := append(fields, index)
-    insertValues := append(valueStrs, keyStr)
-    if keyHash != "" {
-      insertFields = append(insertFields, "hash_" + index)
-      insertValues = append(insertValues, keyHash)
-    }
-    err = self.conn.Insert(self.handa.dbname, table, index, insertFields, insertValues)
+    err = self.conn.Insert(self.handa.dbname, table, dbIndex,
+      append(dbFields, index, dbIndex),
+      append(dbValues, keyStr, dbKey))
     if err != nil {
       e, _ := err.(*tdh.Error)
       if e.ClientStatus == tdh.CLIENT_STATUS_DB_ERROR && e.ErrorCode == 121 {
@@ -96,25 +75,17 @@ func (self *Cursor) InsertUpdate(table string, index string, key interface{}, fi
   if !self.isBatch { defer func() {
     self.end <- true
   }()}
-  keyStr, keyHash, fields, valueStrs := self.handa.checkSchema(table, index, key, fieldList, values...)
-  insertFields := append(fields, index)
-  insertValues := append(valueStrs, keyStr)
-  if keyHash != "" {
-    insertFields = append(insertFields, "hash_" + index)
-    insertValues = append(insertValues, keyHash)
-  }
-  err = self.conn.Insert(self.handa.dbname, table, index, insertFields, insertValues)
+  dbIndex, dbKey, keyStr, dbFields, dbValues := self.handa.checkSchemaAndConvertData(table, index, key, fieldList, values...)
+  err = self.conn.Insert(self.handa.dbname, table, dbIndex,
+    append(dbFields, index, dbIndex),
+    append(dbValues, keyStr, dbKey))
   if err != nil {
     e, _ := err.(*tdh.Error)
     if e.ClientStatus == tdh.CLIENT_STATUS_DB_ERROR && e.ErrorCode == 121 { // update
-      if keyHash != "" {
-        index = "hash_" + index
-        keyStr = keyHash
-      }
-      _, _, err = self.conn.Update(self.handa.dbname, table, index,
-        fields,
-        [][]string{[]string{keyStr}}, tdh.EQ,
-        0, 0, nil, valueStrs)
+      _, _, err = self.conn.Update(self.handa.dbname, table, dbIndex,
+        dbFields,
+        [][]string{[]string{dbKey}}, tdh.EQ,
+        0, 0, nil, dbValues)
     }
   }
   return
@@ -157,28 +128,35 @@ const (
 
 // get
 
-func (self *Cursor) getRows(table string, index string, fields []string, filterStrs []string) ([][][]byte, error) {
+func (self *Cursor) getRows(table string, index string, fields []string, filterStrs []string) (rows [][][]byte, err error) {
   if !self.isValid { panic("Using an invalid cursor") }
   if self.isBatch { panic("Not permit in batch mode") }
   if !self.isBatch { defer func() {
     self.end <- true
   }()}
-  self.handa.ensureIndexExists(table, index)
+
+  if self.handa.ensureIndexExists(table, index) { //is string type
+    index = "hash_" + index
+  }
+
   var filters []tdh.Filter
-  var err error
   if filterStrs != nil {
     filters, err = convertFilterStrings(filterStrs)
     if err != nil {
-      return nil, err
+      return
+    }
+    for i, filter := range filters { // convert text filed to hash field
+      if self.handa.schema[table].columnType[filter.Field] == ColTypeString {
+        filters[i].Field = "hash_" + filters[i].Field
+        filters[i].Value = mmh3Hex(filters[i].Value)
+      }
     }
   }
+
   //TODO keys和op也应为参数
-  rows, _, err := self.conn.Get(self.handa.dbname, table, index, fields,
+  rows, _, err = self.conn.Get(self.handa.dbname, table, index, fields,
     [][]string{[]string{"(null)"}}, tdh.GT, 0, 0, filters)
-  if err != nil {
-    return nil, err
-  }
-  return rows, nil
+  return
 }
 
 // get col

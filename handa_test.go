@@ -222,7 +222,7 @@ func TestEmptyFieldList(t *testing.T) {
 }
 
 func TestTextIndexInsert(t *testing.T) {
-  tablename := "test_" + strconv.Itoa(rand.Intn(10000))
+  tablename := fmt.Sprintf("test_%d", rand.Int63())
   err := db.Insert(tablename, "textcol", "TEXT", "")
   if err != nil {
     t.Fatal("insert error")
@@ -246,7 +246,7 @@ func TestTextIndexInsert(t *testing.T) {
 }
 
 func TestTextIndexUpdate(t *testing.T) {
-  table := fmt.Sprintf("test_%d", rand.Intn(20000))
+  table := fmt.Sprintf("test_%d", rand.Int63())
   err := db.Insert(table, "key", "KEY", "")
   if err != nil {
     t.Fatal("insert fail")
@@ -261,21 +261,28 @@ func TestTextIndexUpdate(t *testing.T) {
 }
 
 func TestHashColumnUpdate(t *testing.T) {
-  table := fmt.Sprintf("test_%d", rand.Intn(20000))
+  table := fmt.Sprintf("test_%d", rand.Int63())
   key2Value := "hello"
   err := db.Insert(table, "key1", "value1", "key2", key2Value)
   if err != nil {
-    t.Fail()
+    t.Fatal("insert error")
   }
   c, _, err := db.Update(table, "key2", key2Value, "key1", "newValue1")
   if err != nil {
-    t.Fail()
+    t.Fatal("update error")
   }
   if c != 1 {
     t.Fatal("update fail")
   }
   err = db.Insert(table, "key1", "newValue1", "") // will fail
   if err == nil {
-    t.Fail()
+    t.Fatal("consistency error")
+  }
+  m, err := db.GetFilteredMap(table, "key2", "key1", "key2=" + key2Value)
+  if err != nil {
+    t.Fatal("get map error: %s", err)
+  }
+  if m[key2Value] != "newValue1" {
+    t.Fatal("not update")
   }
 }

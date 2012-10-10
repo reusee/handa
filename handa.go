@@ -110,37 +110,45 @@ func (self *Handa) mysqlQuery(sql string, args ...interface{}) ([]mysql.Row, mys
   return conn.Query(sql, args...)
 }
 
-func (self *Handa) checkSchema(table string, index string, key interface{}, fieldList string, values ...interface{}) (string, string, []string, []string) {
+func (self *Handa) checkSchemaAndConvertData(table string, index string, key interface{}, 
+  fieldList string, values ...interface{}) (dbIndex string, dbKey string, keyStr string, dbFields []string, dbValues []string) {
+  var t int
+
+  // table
   self.ensureTableExists(table)
-  keyStr, t, _ := convertToString(key)
-  keyHash := ""
+
+  // index and key
+  keyStr, t = convertToString(key)
+  dbKey = keyStr
   self.ensureColumnExists(table, index, t)
-  if self.ensureIndexExists(table, index) {
-    keyHash = mmh3Hex(keyStr)
+  dbIndex = index
+  if self.ensureIndexExists(table, index) { //is string column
+    dbKey = mmh3Hex(dbKey)
+    dbIndex = "hash_" + index
   }
+
+  // fields and values
   fields := strings.Split(fieldList, ",")
   if len(fields) == 1 && fields[0] == "" {
     fields = nil
   }
-  valueStrs := make([]string, len(values))
-  hashFields := make([]string, 0)
-  hashValues := make([]string, 0)
+  dbFields = make([]string, 0)
+  dbValues = make([]string, 0)
   for i, field := range fields {
-    fields[i] = strings.TrimSpace(field)
-    valueStr, t, _ := convertToString(values[i])
+    dbField := strings.TrimSpace(field)
+    dbFields = append(dbFields, dbField)
+    dbValue, t := convertToString(values[i])
+    dbValues = append(dbValues, dbValue)
+    self.ensureColumnExists(table, dbField, t)
     if t == ColTypeString {
-      _, hasHashColumn := self.schema[table].columnType["hash_" + field]
-      if hasHashColumn {
-        hashFields = append(hashFields, "hash_" + field)
-        hashValues = append(hashValues, mmh3Hex(valueStr))
+      fieldHashField := "hash_" + field
+      if _, hasHashColumn := self.schema[table].columnType[fieldHashField]; hasHashColumn {
+        dbFields = append(dbFields, fieldHashField)
+        dbValues = append(dbValues, mmh3Hex(dbValue))
       }
     }
-    valueStrs[i] = valueStr
-    self.ensureColumnExists(table, fields[i], t)
   }
-  fields = append(fields, hashFields...)
-  valueStrs = append(valueStrs, hashValues...)
-  return keyStr, keyHash, fields, valueStrs
+  return
 }
 
 func (self *Handa) withTableCacheOff(fun func()) {
