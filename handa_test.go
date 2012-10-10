@@ -259,10 +259,10 @@ func TestTextIndexUpdate(t *testing.T) {
   }
   count, change, err := db.Update(table, "key", "KEY", "foo", "FOO")
   if err != nil {
-    t.Fatal("update operation error")
+    t.Fatal("update operation error", table, err)
   }
   if count != 1 || change != 1 {
-    t.Fatal("update fail: %s", table)
+    t.Fatal("update fail", table)
   }
 }
 
@@ -278,7 +278,7 @@ func TestHashColumnUpdate(t *testing.T) {
     t.Fatal("update error")
   }
   if c != 1 {
-    t.Fatal("update fail")
+    t.Fatal("update fail", table)
   }
   err = db.Insert(table, "key1", "newValue1", "") // will fail
   if err == nil {
@@ -293,7 +293,7 @@ func TestHashColumnUpdate(t *testing.T) {
   }
 }
 
-//func TestMultiColumnIndex(t *testing.T) {
-//  db.Insert("price", "itemid, time", []interface{}{1, 20121009}, "price", 5.5)
-//  db.Insert("price", "itemid, time", []interface{}{1, 20121008}, "price", 5.5)
-//}
+func TestMultiColumnIndex(t *testing.T) {
+  db.Insert("price", "itemid, time", []interface{}{1, 20121009}, "price", 5.5)
+  db.Insert("price", "itemid, time", []interface{}{1, 20121008}, "price", 5.5)
+}

@@ -59,6 +59,7 @@ func New(host string, port string, user string, password string, database string
 }
 
 func (self *Handa) loadTableInfo(tableName string) *TableInfo {
+  //TODO load multiple column unique keys
   tableInfo := &TableInfo{
     name: tableName,
     columnType: make(map[string]int),
@@ -120,6 +121,11 @@ func (self *Handa) checkSchemaAndConvertData(table string, indexesStr string, ke
   self.ensureTableExists(table)
 
   // index and key
+  // split indexes
+  // convert keys to string
+  // ensure key columns exists
+  // ensure index exists
+
   indexStrs = strings.Split(indexesStr, ",")
   for i, indexStr := range indexStrs {
     indexStrs[i] = strings.TrimSpace(indexStr)
@@ -130,11 +136,12 @@ func (self *Handa) checkSchemaAndConvertData(table string, indexesStr string, ke
   if len(indexStrs) == 1 {
     keyStr, t := convertToString(keys)
     dbKey := keyStr
-    self.ensureColumnExists(table, indexStrs[0], t)
-    dbIndex = indexStrs[0]
-    if self.ensureIndexExists(table, indexStrs[0]) {
+    index := indexStrs[0]
+    self.ensureColumnExists(table, index, t)
+    var isString []bool
+    dbIndex, isString = self.ensureIndexExists(table, index)
+    if isString[0] {
       dbKey = mmh3Hex(dbKey)
-      dbIndex = "hash_" + indexStrs[0]
     }
     dbKeys = append(dbKeys, dbKey)
     keyStrs = append(keyStrs, keyStr)
@@ -187,7 +194,7 @@ func (self *Handa) ensureTableExists(table string) {
   }
 }
 
-func (self *Handa) ensureColumnExists(table string, column string, t int) {
+func (self *Handa) ensureColumnExists(table string, column string, t int) (created bool) {
   if column == "serial" {
     return
   }
@@ -209,35 +216,53 @@ func (self *Handa) ensureColumnExists(table string, column string, t int) {
     self.withTableCacheOff(func() {
       self.mysqlQuery("ALTER TABLE `%s` ADD (`%s` %s NULL DEFAULT NULL)", table, column, columnType)
     })
+    created = true
     self.schema[table] = self.loadTableInfo(table)
   }
+  return
 }
 
-func (self *Handa) ensureIndexExists(table string, column string) (isString bool) {
-  if column == "serial" {
+func (self *Handa) ensureIndexExists(table string, columns ...string) (indexName string, isString []bool) {
+  if len(columns) == 1 && columns[0] == "serial" {
+    indexName = "serial"
+    isString = append(isString, false)
     return
   }
-  indexColumnName := column
-  if self.schema[table].columnType[column] == ColTypeString {
-    indexColumnName = "hash_" + column
-    isString = true
+  indexSubnames := make([]string, len(columns))
+  isString = make([]bool, len(columns))
+  for i, column := range columns {
+    indexSubname := column
+    if self.schema[table].columnType[column] == ColTypeString {
+      indexSubname = "hash_" + column
+      isString[i] = true
+    }
+    indexSubnames[i] = indexSubname
   }
-  if !self.schema[table].index[indexColumnName] {
-    if isString {
-      self.ensureColumnExists(table, indexColumnName, ColTypeHash)
+  indexName = strings.Join(indexSubnames, "$")
+  if !self.schema[table].index[indexName] { // create index
+    quotedColumns := make([]string, len(indexSubnames))
+    for i, t := range isString {
+      if t { // ensure hash column exists
+        created := self.ensureColumnExists(table, indexSubnames[i], ColTypeHash)
+        if created { // update hashes
+          data, err := self.GetMap(table, "serial", columns[i])
+          if err != nil {
+            log.Fatal("get data error ", err)
+          }
+          batch := self.Batch()
+          for k, v := range data {
+            batch.Update(table, "serial", k, indexSubnames[i], mmh3Hex(v))
+          }
+          batch.Commit()
+        }
+      }
+      quotedColumns[i] = "`" + indexSubnames[i] + "`"
     }
-    // update hashes
-    data, _ := self.GetMap(table, "serial", column)
-    batch := self.Batch()
-    for k, v := range data {
-      batch.Update(table, "serial", k, indexColumnName, mmh3Hex(v))
-    }
-    batch.Commit()
     self.withTableCacheOff(func() {
-      _, _, err := self.mysqlQuery("CREATE UNIQUE INDEX `%s` ON `%s` (`%s`)",
-        indexColumnName, table, indexColumnName)
+      _, _, err := self.mysqlQuery("CREATE UNIQUE INDEX `%s` ON `%s` (%s)",
+        indexName, table, strings.Join(quotedColumns, ","))
       if err != nil {
-        log.Fatal(err)
+        log.Fatal("index creation error: %s", err)
       }
     })
     self.schema[table] = self.loadTableInfo(table)

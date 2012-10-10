@@ -26,6 +26,10 @@ func (self *Cursor) Update(table string, index string, key interface{}, fieldLis
     self.end <- true
   }()}
   dbIndex, _, dbKeys, _, _, dbFields, dbValues := self.handa.checkSchemaAndConvertData(table, index, key, fieldList, values...)
+  //fmt.Printf("dbIndex>> %v\n", dbIndex)
+  //fmt.Printf("dbKeys>> %v\n", dbKeys)
+  //fmt.Printf("dbFields>> %v\n", dbFields)
+  //fmt.Printf("dbValues>> %v\n", dbValues)
   count, change, err = self.conn.Update(self.handa.dbname, table, dbIndex,
     dbFields,
     [][]string{dbKeys}, tdh.EQ,
@@ -141,9 +145,7 @@ func (self *Cursor) getRows(table string, index string, fields []string, filterS
     self.end <- true
   }()}
 
-  if self.handa.ensureIndexExists(table, index) { //is string type
-    index = "hash_" + index
-  }
+  index, _ = self.handa.ensureIndexExists(table, index)
 
   var filters []tdh.Filter
   if filterStrs != nil {
