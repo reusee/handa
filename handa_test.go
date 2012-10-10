@@ -67,7 +67,14 @@ func TestInsertUpdate(t *testing.T) {
   n := rand.Int63()
   db.Insert("thread", "tid", n, "subject", "OK")
   db.InsertUpdate("thread", "tid", n, "subject", "YES")
-  //TODO fetch and check
+  nStr := fmt.Sprintf("%d", n)
+  m, err := db.GetFilteredMap("thread", "tid", "subject", "tid=" + nStr)
+  if err != nil {
+    t.Fail()
+  }
+  if m[nStr] != "YES" {
+    t.Fail()
+  }
 }
 
 func BenchmarkUpdateInsert(b *testing.B) {
