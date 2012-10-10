@@ -120,12 +120,23 @@ func (self *Handa) checkSchema(table string, index string, key interface{}, fiel
     fields = nil
   }
   valueStrs := make([]string, len(values))
+  hashFields := make([]string, 0)
+  hashValues := make([]string, 0)
   for i, field := range fields {
     fields[i] = strings.TrimSpace(field)
     valueStr, t, _ := convertToString(values[i])
+    if t == ColTypeString {
+      _, hasHashColumn := self.schema[table].columnType["hash_" + field]
+      if hasHashColumn {
+        hashFields = append(hashFields, "hash_" + field)
+        hashValues = append(hashValues, fmt.Sprintf("%x", mmh3.Hash128([]byte(valueStr))))
+      }
+    }
     valueStrs[i] = valueStr
     self.ensureColumnExists(table, fields[i], t)
   }
+  fields = append(fields, hashFields...)
+  valueStrs = append(valueStrs, hashValues...)
   if isString { // calculate hash
     fields = append(fields, "hash_" + index)
     valueStrs = append(valueStrs, fmt.Sprintf("%x", mmh3.Hash128([]byte(keyStr))))

@@ -240,3 +240,23 @@ func TestTextTypeIndex(t *testing.T) {
     t.Fail()
   }
 }
+
+func TestHashColumnUpdate(t *testing.T) {
+  table := fmt.Sprintf("test_%d", rand.Intn(20000))
+  key2Value := 5
+  err := db.Insert(table, "key1", "value1", "key2", key2Value)
+  if err != nil {
+    t.Fail()
+  }
+  c, _, err := db.Update(table, "key2", key2Value, "key1", "newValue1")
+  if err != nil {
+    t.Fail()
+  }
+  if c != 1 {
+    t.Fail()
+  }
+  err = db.Insert(table, "key1", "newValue1", "") // will fail
+  if err == nil {
+    t.Fail()
+  }
+}

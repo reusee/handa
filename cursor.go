@@ -21,8 +21,10 @@ func (self *Cursor) Update(table string, index string, key interface{}, fieldLis
     self.end <- true
   }()}
   keyStr, fields, valueStrs := self.handa.checkSchema(table, index, key, fieldList, values...)
-  count, change, err = self.conn.Update(self.handa.dbname, table, index, fields, [][]string{[]string{keyStr}}, 
-  tdh.EQ, 0, 0, nil, valueStrs)
+  count, change, err = self.conn.Update(self.handa.dbname, table, index,
+    fields,
+    [][]string{[]string{keyStr}}, tdh.EQ,
+    0, 0, nil, valueStrs)
   if err != nil {
     return
   }
