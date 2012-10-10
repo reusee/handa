@@ -20,7 +20,11 @@ func (self *Cursor) Update(table string, index string, key interface{}, fieldLis
   if !self.isBatch { defer func() {
     self.end <- true
   }()}
-  keyStr, fields, valueStrs := self.handa.checkSchema(table, index, key, fieldList, values...)
+  keyStr, keyHash, fields, valueStrs := self.handa.checkSchema(table, index, key, fieldList, values...)
+  if keyHash != "" {
+    keyStr = keyHash
+    index = "hash_" + index
+  }
   count, change, err = self.conn.Update(self.handa.dbname, table, index,
     fields,
     [][]string{[]string{keyStr}}, tdh.EQ,
@@ -36,10 +40,14 @@ func (self *Cursor) Insert(table string, index string, key interface{}, fieldLis
   if !self.isBatch { defer func() {
     self.end <- true
   }()}
-  keyStr, fields, valueStrs := self.handa.checkSchema(table, index, key, fieldList, values...)
-  err = self.conn.Insert(self.handa.dbname, table, index,
-    append(fields, index),
-    append(valueStrs, keyStr))
+  keyStr, keyHash, fields, valueStrs := self.handa.checkSchema(table, index, key, fieldList, values...)
+  insertFields := append(fields, index)
+  insertValues := append(valueStrs, keyStr)
+  if keyHash != "" {
+    insertFields = append(insertFields, "hash_" + index)
+    insertValues = append(insertValues, keyHash)
+  }
+  err = self.conn.Insert(self.handa.dbname, table, index, insertFields, insertValues)
   return
 }
 
@@ -49,15 +57,29 @@ func (self *Cursor) UpdateInsert(table string, index string, key interface{}, fi
   if !self.isBatch { defer func() {
     self.end <- true
   }()}
-  keyStr, fields, valueStrs := self.handa.checkSchema(table, index, key, fieldList, values...)
+  keyStr, keyHash, fields, valueStrs := self.handa.checkSchema(table, index, key, fieldList, values...)
   var count int
-  count, _, err = self.conn.Update(self.handa.dbname, table, index, fields, [][]string{[]string{keyStr}}, 
-  tdh.EQ, 0, 0, nil, valueStrs)
+  updateIndex := index
+  updateKeyStr := keyStr
+  if keyHash != "" {
+    updateIndex = "hash_" + index
+    updateKeyStr = keyHash
+  }
+  count, _, err = self.conn.Update(self.handa.dbname, table, updateIndex,
+    fields,
+    [][]string{[]string{updateKeyStr}}, tdh.EQ,
+    0, 0, nil, valueStrs)
   if err != nil {
     return
   }
   if count == 0 { // not exists, then insert
-    err = self.conn.Insert(self.handa.dbname, table, index, append(fields, index), append(valueStrs, keyStr))
+    insertFields := append(fields, index)
+    insertValues := append(valueStrs, keyStr)
+    if keyHash != "" {
+      insertFields = append(insertFields, "hash_" + index)
+      insertValues = append(insertValues, keyHash)
+    }
+    err = self.conn.Insert(self.handa.dbname, table, index, insertFields, insertValues)
     if err != nil {
       e, _ := err.(*tdh.Error)
       if e.ClientStatus == tdh.CLIENT_STATUS_DB_ERROR && e.ErrorCode == 121 {
@@ -74,13 +96,25 @@ func (self *Cursor) InsertUpdate(table string, index string, key interface{}, fi
   if !self.isBatch { defer func() {
     self.end <- true
   }()}
-  keyStr, fields, valueStrs := self.handa.checkSchema(table, index, key, fieldList, values...)
-  err = self.conn.Insert(self.handa.dbname, table, index, append(fields, index), append(valueStrs, keyStr))
+  keyStr, keyHash, fields, valueStrs := self.handa.checkSchema(table, index, key, fieldList, values...)
+  insertFields := append(fields, index)
+  insertValues := append(valueStrs, keyStr)
+  if keyHash != "" {
+    insertFields = append(insertFields, "hash_" + index)
+    insertValues = append(insertValues, keyHash)
+  }
+  err = self.conn.Insert(self.handa.dbname, table, index, insertFields, insertValues)
   if err != nil {
     e, _ := err.(*tdh.Error)
     if e.ClientStatus == tdh.CLIENT_STATUS_DB_ERROR && e.ErrorCode == 121 { // update
-      _, _, err = self.conn.Update(self.handa.dbname, table, index, fields, [][]string{[]string{keyStr}}, 
-      tdh.EQ, 0, 0, nil, valueStrs)
+      if keyHash != "" {
+        index = "hash_" + index
+        keyStr = keyHash
+      }
+      _, _, err = self.conn.Update(self.handa.dbname, table, index,
+        fields,
+        [][]string{[]string{keyStr}}, tdh.EQ,
+        0, 0, nil, valueStrs)
     }
   }
   return

@@ -110,11 +110,14 @@ func (self *Handa) mysqlQuery(sql string, args ...interface{}) ([]mysql.Row, mys
   return conn.Query(sql, args...)
 }
 
-func (self *Handa) checkSchema(table string, index string, key interface{}, fieldList string, values ...interface{}) (string, []string, []string) {
+func (self *Handa) checkSchema(table string, index string, key interface{}, fieldList string, values ...interface{}) (string, string, []string, []string) {
   self.ensureTableExists(table)
   keyStr, t, _ := convertToString(key)
+  keyHash := ""
   self.ensureColumnExists(table, index, t)
-  isString := self.ensureIndexExists(table, index)
+  if self.ensureIndexExists(table, index) {
+    keyHash = mmh3Hex(keyStr)
+  }
   fields := strings.Split(fieldList, ",")
   if len(fields) == 1 && fields[0] == "" {
     fields = nil
@@ -129,7 +132,7 @@ func (self *Handa) checkSchema(table string, index string, key interface{}, fiel
       _, hasHashColumn := self.schema[table].columnType["hash_" + field]
       if hasHashColumn {
         hashFields = append(hashFields, "hash_" + field)
-        hashValues = append(hashValues, fmt.Sprintf("%x", mmh3.Hash128([]byte(valueStr))))
+        hashValues = append(hashValues, mmh3Hex(valueStr))
       }
     }
     valueStrs[i] = valueStr
@@ -137,11 +140,7 @@ func (self *Handa) checkSchema(table string, index string, key interface{}, fiel
   }
   fields = append(fields, hashFields...)
   valueStrs = append(valueStrs, hashValues...)
-  if isString { // calculate hash
-    fields = append(fields, "hash_" + index)
-    valueStrs = append(valueStrs, fmt.Sprintf("%x", mmh3.Hash128([]byte(keyStr))))
-  }
-  return keyStr, fields, valueStrs
+  return keyStr, keyHash, fields, valueStrs
 }
 
 func (self *Handa) withTableCacheOff(fun func()) {
@@ -166,6 +165,9 @@ func (self *Handa) ensureTableExists(table string) {
 }
 
 func (self *Handa) ensureColumnExists(table string, column string, t int) {
+  if column == "serial" {
+    return
+  }
   _, exists := self.schema[table].columnType[column]
   if !exists {
     var columnType string
@@ -189,6 +191,9 @@ func (self *Handa) ensureColumnExists(table string, column string, t int) {
 }
 
 func (self *Handa) ensureIndexExists(table string, column string) (isString bool) {
+  if column == "serial" {
+    return
+  }
   indexColumnName := column
   if self.schema[table].columnType[column] == ColTypeString {
     indexColumnName = "hash_" + column
@@ -198,8 +203,19 @@ func (self *Handa) ensureIndexExists(table string, column string) (isString bool
     if isString {
       self.ensureColumnExists(table, indexColumnName, ColTypeHash)
     }
+    // update hashes
+    data, _ := self.GetMap(table, "serial", column)
+    batch := self.Batch()
+    for k, v := range data {
+      batch.Update(table, "serial", k, indexColumnName, mmh3Hex(v))
+    }
+    batch.Commit()
     self.withTableCacheOff(func() {
-      self.mysqlQuery(`CREATE UNIQUE INDEX %s ON %s (%s)`, column, table, indexColumnName)
+      _, _, err := self.mysqlQuery("CREATE UNIQUE INDEX `%s` ON `%s` (`%s`)",
+        indexColumnName, table, indexColumnName)
+      if err != nil {
+        log.Fatal(err)
+      }
     })
     self.schema[table] = self.loadTableInfo(table)
   }
@@ -237,4 +253,8 @@ func (self *Handa) Batch() *Cursor {
 
 func fatal(format string, args ...interface{}) {
   log.Fatal(fmt.Sprintf(format, args...))
+}
+
+func mmh3Hex(s string) string {
+  return fmt.Sprintf("%x", string(mmh3.Hash128([]byte(s))))
 }

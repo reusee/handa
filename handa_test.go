@@ -165,7 +165,6 @@ func TestGetMap(t *testing.T) {
 func TestGetFilteredCol(t *testing.T) {
   res, err := db.GetFilteredCol("thread", "tid", "tid>50", "collect=0")
   if err != nil {
-    fmt.Printf("%s\n", err)
     t.Fail()
   }
   if !(len(res) > 0) {
@@ -215,13 +214,11 @@ func TestEmptyFieldList(t *testing.T) {
   db.Insert("thread", "tid", rand.Int63(), "")
 }
 
-func TestTextTypeIndex(t *testing.T) {
+func TestTextIndexInsert(t *testing.T) {
   tablename := "test_" + strconv.Itoa(rand.Intn(10000))
-  fmt.Printf("%s\n", tablename)
   err := db.Insert(tablename, "textcol", "TEXT", "")
   if err != nil {
-    fmt.Printf("%s\n", err)
-    t.Fail()
+    t.Fatal("insert error")
   }
   db.Insert(tablename, "textcol", "TEXT", "")
   rows, _, _ := db.mysqlQuery("SELECT COUNT(*) FROM %s", tablename)
@@ -241,9 +238,24 @@ func TestTextTypeIndex(t *testing.T) {
   }
 }
 
+func TestTextIndexUpdate(t *testing.T) {
+  table := fmt.Sprintf("test_%d", rand.Intn(20000))
+  err := db.Insert(table, "key", "KEY", "")
+  if err != nil {
+    t.Fatal("insert fail")
+  }
+  count, change, err := db.Update(table, "key", "KEY", "foo", "FOO")
+  if err != nil {
+    t.Fatal("update operation error")
+  }
+  if count != 1 || change != 1 {
+    t.Fatal("update fail")
+  }
+}
+
 func TestHashColumnUpdate(t *testing.T) {
   table := fmt.Sprintf("test_%d", rand.Intn(20000))
-  key2Value := 5
+  key2Value := "hello"
   err := db.Insert(table, "key1", "value1", "key2", key2Value)
   if err != nil {
     t.Fail()
@@ -253,7 +265,7 @@ func TestHashColumnUpdate(t *testing.T) {
     t.Fail()
   }
   if c != 1 {
-    t.Fail()
+    t.Fatal("update fail")
   }
   err = db.Insert(table, "key1", "newValue1", "") // will fail
   if err == nil {
