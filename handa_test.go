@@ -387,3 +387,81 @@ func TestTextFieldFilter(t *testing.T) {
     t.Fail()
   }
 }
+
+func TestGetMultiCol(t *testing.T) {
+  table := fmt.Sprintf("test_%d", rand.Int63())
+  db.Insert(table, "c1", 1, "c2,c3", "FOO", "BAR")
+  res, err := db.GetMultiCol(table, "c1, c2, c3")
+  if err != nil {
+    t.Fail()
+  }
+  if len(res) != 1 {
+    t.Fail()
+  }
+  if res[0][0] != "1" || res[0][1] != "FOO" || res[0][2] != "BAR" {
+    t.Fail()
+  }
+}
+
+func TestGetMultiFilteredCol(t *testing.T) {
+  table := fmt.Sprintf("test_%d", rand.Int63())
+  db.Insert(table, "c1", 1, "c2,c3", "FOO", "BAR")
+  db.Insert(table, "c1", 2, "c2,c3", "Foo", "Bar")
+  res, err := db.GetMultiFilteredCol(table, "c1, c2, c3", "c1=2")
+  if err != nil {
+    t.Fail()
+  }
+  if len(res) != 1 {
+    t.Fail()
+  }
+  if res[0][0] != "2" || res[0][1] != "Foo" || res[0][2] != "Bar" {
+    t.Fail()
+  }
+}
+
+func TestGetMultiRangedCol(t *testing.T) {
+  table := fmt.Sprintf("test_%d", rand.Int63())
+  for i := 0; i < 10; i++ {
+    db.Insert(table, "i", i, "foo,bar", "FOO", "BAR")
+  }
+  res, err := db.GetMultiRangedCol(table, "i,foo,bar", 3, 5)
+  if err != nil {
+    t.Fail()
+  }
+  if len(res) != 5 {
+    t.Fail()
+  }
+  for i := 0; i < 5; i++ {
+    row := res[i]
+    if row[0] != strconv.Itoa(i + 3) {
+      t.Fail()
+    }
+    if row[1] != "FOO" || row[2] != "BAR" {
+      t.Fail()
+    }
+  }
+}
+
+func TestGetMultiRangedFilteredCol(t *testing.T) {
+  table := fmt.Sprintf("test_%d", rand.Int63())
+  for i := 0; i < 10; i++ {
+    db.Insert(table, "i", i, "c2,c3,p", "FOO", "BAR", "P1")
+    db.Insert(table, "i", i + 20, "c2,c3,p", "Foo", "Bar", "P2")
+  }
+  res, err := db.GetMultiRangedFilteredCol(table, "i,c2,c3", 4, 5, "p=P2")
+  if err != nil {
+    t.Fatal("get error")
+  }
+  if len(res) != 5 {
+    t.Fatal("result number not match")
+  }
+  for i := 0; i < 5; i++ {
+    row := res[i]
+    if row[0] != strconv.Itoa(i + 20 + 4) {
+      t.Fatal("i not match")
+    }
+    if row[1] != "Foo" || row[2] != "Bar" {
+      t.Fatal("column not match")
+    }
+  }
+}

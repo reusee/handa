@@ -5,6 +5,7 @@ import (
   "regexp"
   "errors"
   "fmt"
+  "strings"
 )
 
 func init() {
@@ -173,8 +174,26 @@ func (self *Cursor) getCol(table string, index string, filterStrs []string, star
   }
   ret := make([]string, len(rows))
   for i, row := range rows {
-    for _, col := range row {
-      ret[i] = string(col)
+    ret[i] = string(row[0])
+  }
+  return ret, nil
+}
+
+func (self *Cursor) getMultiCol(table string, fieldsStr string, filterStrs []string, start int, limit int) ([][]string, error) {
+  fields := make([]string, 0)
+  for _, field := range strings.Split(fieldsStr, ",") {
+    fields = append(fields, strings.TrimSpace(field))
+  }
+  index := fields[0]
+  rows, err := self.getRows(table, index, fields, filterStrs, start, limit)
+  if err != nil {
+    return nil, err
+  }
+  ret := make([][]string, len(rows))
+  for i, row := range rows {
+    ret[i] = make([]string, len(row))
+    for j, col := range row {
+      ret[i][j] = string(col)
     }
   }
   return ret, nil
@@ -184,16 +203,32 @@ func (self *Cursor) GetCol(table string, index string) ([]string, error) {
   return self.getCol(table, index, nil, 0, 0)
 }
 
+func (self *Cursor) GetMultiCol(table string, fields string) ([][]string, error) {
+  return self.getMultiCol(table, fields, nil, 0, 0)
+}
+
 func (self *Cursor) GetFilteredCol(table string, index string, filters ...string) ([]string, error) {
   return self.getCol(table, index, filters, 0, 0)
+}
+
+func (self *Cursor) GetMultiFilteredCol(table string, fields string, filters ...string) ([][]string, error) {
+  return self.getMultiCol(table, fields, filters, 0, 0)
 }
 
 func (self *Cursor) GetRangedCol(table string, index string, start int, limit int) ([]string, error) {
   return self.getCol(table, index, nil, start, limit)
 }
 
+func (self *Cursor) GetMultiRangedCol(table string, fields string, start int, limit int) ([][]string, error) {
+  return self.getMultiCol(table, fields, nil, start, limit)
+}
+
 func (self *Cursor) GetRangedFilteredCol(table string, index string, start int, limit int, filters ...string) ([]string, error) {
   return self.getCol(table, index, filters, start, limit)
+}
+
+func (self *Cursor) GetMultiRangedFilteredCol(table string, index string, start int, limit int, filters ...string) ([][]string, error) {
+  return self.getMultiCol(table, index, filters, start, limit)
 }
 
 // get map

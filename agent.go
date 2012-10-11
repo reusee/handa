@@ -1,5 +1,7 @@
 package handa
 
+// insert and update
+
 func (self *Handa) Update(table string, index string, key interface{}, fieldList string, values ...interface{}) (count int, change int, err error) {
   return self.NewCursor(false).Update(table, index, key, fieldList, values...)
 }
@@ -16,21 +18,41 @@ func (self *Handa) UpdateInsert(table string, index string, key interface{}, fie
   return self.NewCursor(false).UpdateInsert(table, index, key, fieldList, values...)
 }
 
+// col
+
 func (self *Handa) GetCol(table string, index string) ([]string, error) {
   return self.NewCursor(false).GetCol(table, index)
+}
+
+func (self *Handa) GetMultiCol(table string, fields string) ([][]string, error) {
+  return self.NewCursor(false).GetMultiCol(table, fields)
 }
 
 func (self *Handa) GetFilteredCol(table string, index string, filters ...string) ([]string, error) {
   return self.NewCursor(false).GetFilteredCol(table, index, filters...)
 }
 
+func (self *Handa) GetMultiFilteredCol(table string, fields string, filters ...string) ([][]string, error) {
+  return self.NewCursor(false).GetMultiFilteredCol(table, fields, filters...)
+}
+
 func (self *Handa) GetRangedCol(table string, index string, start int, limit int) ([]string, error) {
   return self.NewCursor(false).GetRangedCol(table, index, start, limit)
+}
+
+func (self *Handa) GetMultiRangedCol(table string, fields string, start int, limit int) ([][]string, error) {
+  return self.NewCursor(false).GetMultiRangedCol(table, fields, start, limit)
 }
 
 func (self *Handa) GetRangedFilteredCol(table string, index string, start int, limit int, filters ...string) ([]string, error) {
   return self.NewCursor(false).GetRangedFilteredCol(table, index, start, limit, filters...)
 }
+
+func (self *Handa) GetMultiRangedFilteredCol(table string, index string, start int, limit int, filters ...string) ([][]string, error) {
+  return self.NewCursor(false).GetMultiRangedFilteredCol(table, index, start, limit, filters...)
+}
+
+// map
 
 func (self *Handa) GetMap(table string, index string, field string) (map[string]string, error) {
   return self.NewCursor(false).GetMap(table, index, field)
