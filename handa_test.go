@@ -342,5 +342,7 @@ func TestTextFieldFilter(t *testing.T) {
   if err != nil {
     t.Fatal("GetFilteredCol fail", err)
   }
-  fmt.Printf("%s\n", rows)
+  if len(rows) != 4 {
+    t.Fail()
+  }
 }

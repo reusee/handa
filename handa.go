@@ -76,6 +76,8 @@ func (self *Handa) loadTableInfo(tableName string) *TableInfo {
     case "double":
       tableInfo.columnType[columnName] = ColTypeFloat
     case "longtext", "longblob":
+      tableInfo.columnType[columnName] = ColTypeLongString
+    case "varchar(255)":
       tableInfo.columnType[columnName] = ColTypeString
     case "char(32)":
       tableInfo.columnType[columnName] = ColTypeHash
@@ -97,6 +99,7 @@ const (
   ColTypeInt
   ColTypeFloat
   ColTypeString
+  ColTypeLongString
   ColTypeHash
 )
 
@@ -174,7 +177,7 @@ func (self *Handa) checkSchemaAndConvertData(table string, indexesStr string, ke
     dbValue, t := convertToString(values[i])
     dbValues = append(dbValues, dbValue)
     self.ensureColumnExists(table, dbField, t)
-    if t == ColTypeString {
+    if t == ColTypeLongString {
       fieldHashField := "hash_" + field
       if _, hasHashColumn := self.schema[table].columnType[fieldHashField]; hasHashColumn {
         dbFields = append(dbFields, fieldHashField)
@@ -220,8 +223,10 @@ func (self *Handa) ensureColumnExists(table string, column string, t int) (creat
       columnType = "BIGINT(255)"
     case ColTypeFloat:
       columnType = "DOUBLE"
-    case ColTypeString:
+    case ColTypeLongString:
       columnType = "LONGTEXT"
+    case ColTypeString:
+      columnType = "VARCHAR(255)"
     case ColTypeHash:
       columnType = "CHAR(32)"
     }
@@ -244,7 +249,7 @@ func (self *Handa) ensureIndexExists(table string, columns ...string) (indexName
   isString = make([]bool, len(columns))
   for i, column := range columns {
     indexSubname := column
-    if self.schema[table].columnType[column] == ColTypeString {
+    if self.schema[table].columnType[column] == ColTypeLongString {
       indexSubname = "hash_" + column
       isString[i] = true
     }

@@ -48,9 +48,12 @@ func convertToString(in interface{}) (ret string, t int) {
   case string:
     ret = v
     t = ColTypeString
+    if len(v) > 255 {
+      t = ColTypeLongString
+    }
   case []byte:
     ret = string(v)
-    t = ColTypeString
+    t = ColTypeLongString
   default:
     panic("unknown type")
   }

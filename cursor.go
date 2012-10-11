@@ -152,7 +152,7 @@ func (self *Cursor) getRows(table string, index string, fields []string, filterS
       return
     }
     for i, filter := range filters { // convert text filed to hash field
-      if self.handa.schema[table].columnType[filter.Field] == ColTypeString {
+      if self.handa.schema[table].columnType[filter.Field] == ColTypeLongString {
         filters[i].Field = "hash_" + filters[i].Field
         filters[i].Value = mmh3Hex(filters[i].Value)
       }
