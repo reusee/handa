@@ -465,3 +465,90 @@ func TestGetMultiRangedFilteredCol(t *testing.T) {
     }
   }
 }
+
+func TestGetMultiMap(t *testing.T) {
+  table := fmt.Sprintf("test_%d", rand.Int63())
+  for i := 0; i < 5; i++ {
+    db.Insert(table, "i", i, "a,b", strings.Repeat("A", i), strings.Repeat("B", i))
+  }
+  m, err := db.GetMultiMap(table, "i", "a,b")
+  if err != nil {
+    t.Fatal("GetMultiMap fail")
+  }
+  if len(m) != 5 {
+    t.Fatal("len error")
+  }
+  for i := 0; i < 5; i++ {
+    key := strconv.Itoa(i)
+    if m[key][0] != strings.Repeat("A", i) || m[key][1] != strings.Repeat("B", i) {
+      t.Fatal("value error")
+    }
+  }
+}
+
+func TestGetMultiFilteredMap(t *testing.T) {
+  table := fmt.Sprintf("test_%d", rand.Int63())
+  for i := 0; i < 5; i++ {
+    db.Insert(table, "i", i, "a,b", strings.Repeat("A", i), strings.Repeat("B", i))
+  }
+  m, err := db.GetMultiFilteredMap(table, "i", "a,b", "a=AAA")
+  if err != nil {
+    t.Fatal("GetMultiFilteredMap error")
+  }
+  if m["3"] == nil {
+    t.Fatal("get fail")
+  }
+  if m["3"][1] != "BBB" {
+    t.Fatal("field value error")
+  }
+}
+
+func TestGetMultiRangedMap(t *testing.T) {
+  table := fmt.Sprintf("test_%d", rand.Int63())
+  for i := 0; i < 5; i++ {
+    db.Insert(table, "i", i, "a,b", strings.Repeat("A", i), strings.Repeat("B", i))
+  }
+  m, err := db.GetMultiRangedMap(table, "i", "a,b", 2, 3)
+  if err != nil {
+    t.Fatal("GetMultiRangedMap error")
+  }
+  for i := 2; i < 5; i++ {
+    key := strconv.Itoa(i)
+    if m[key] == nil {
+      t.Fatal("get error")
+    }
+    if len(m[key]) != 2 {
+      t.Fatal("field number error")
+    }
+    if m[key][0] != strings.Repeat("A", i) || m[key][1] != strings.Repeat("B", i) {
+      t.Fatal("field value error")
+    }
+  }
+}
+
+func TestGetMultiRangedFilteredMap(t *testing.T) {
+  table := fmt.Sprintf("test_%d", rand.Int63())
+  for i := 0; i < 5; i++ {
+    db.Insert(table, "i", i, "a,b,p", strings.Repeat("a", i), strings.Repeat("b", i), "foo")
+    db.Insert(table, "i", i + 30, "a,b,p", strings.Repeat("A", i), strings.Repeat("B", i), "bar")
+  }
+  m, err := db.GetMultiRangedFilteredMap(table, "i", "a,b", 2, 3, "p=bar")
+  if err != nil {
+    t.Fatal("GetMultiRangedFilteredMap error")
+  }
+  if len(m) != 3 {
+    t.Fatal("len error")
+  }
+  for i := 0; i < 3; i++ {
+    key := strconv.Itoa(i + 30 + 2)
+    if m[key] == nil {
+      t.Fatal("key error")
+    }
+    if len(m[key]) != 2 {
+      t.Fatal("value len error")
+    }
+    if m[key][0] != strings.Repeat("A", i + 2) || m[key][1] != strings.Repeat("B", i + 2) {
+      t.Fatal("value error")
+    }
+  }
+}

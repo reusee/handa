@@ -245,20 +245,56 @@ func (self *Cursor) getMap(table string, index string, field string, filterStrs 
   return ret, nil
 }
 
+func (self *Cursor) getMultiMap(table string, index string, fieldsStr string, filterStrs []string, start int, limit int) (map[string][]string, error) {
+  fields := []string{index}
+  for _, field := range strings.Split(fieldsStr, ",") {
+    fields = append(fields, strings.TrimSpace(field))
+  }
+  rows, err := self.getRows(table, index, fields, filterStrs, start, limit)
+  if err != nil {
+    return nil, err
+  }
+  ret := make(map[string][]string)
+  for _, row := range rows {
+    values := make([]string, 0)
+    for i := 1; i < len(row); i++ {
+      values = append(values, string(row[i]))
+    }
+    ret[string(row[0])] = values
+  }
+  return ret, nil
+}
+
 func (self *Cursor) GetMap(table string, index string, field string) (map[string]string, error) {
   return self.getMap(table, index, field, nil, 0, 0)
+}
+
+func (self *Cursor) GetMultiMap(table string, index string, fields string) (map[string][]string, error) {
+  return self.getMultiMap(table, index, fields, nil, 0, 0)
 }
 
 func (self *Cursor) GetFilteredMap(table string, index string, field string, filters ...string) (map[string]string, error) {
   return self.getMap(table, index, field, filters, 0, 0)
 }
 
+func (self *Cursor) GetMultiFilteredMap(table string, index string, fields string, filters ...string) (map[string][]string, error) {
+  return self.getMultiMap(table, index, fields, filters, 0, 0)
+}
+
 func (self *Cursor) GetRangedMap(table string, index string, field string, start int, limit int) (map[string]string, error) {
   return self.getMap(table, index, field, nil, start, limit)
 }
 
+func (self *Cursor) GetMultiRangedMap(table string, index string, fields string, start int, limit int) (map[string][]string, error) {
+  return self.getMultiMap(table, index, fields, nil, start, limit)
+}
+
 func (self *Cursor) GetRangedFilteredMap(table string, index string, field string, start int, limit int, filters ...string) (map[string]string, error) {
   return self.getMap(table, index, field, filters, start, limit)
+}
+
+func (self *Cursor) GetMultiRangedFilteredMap(table string, index string, fields string, start int, limit int, filters ...string) (map[string][]string, error) {
+  return self.getMultiMap(table, index, fields, filters, start, limit)
 }
 
 // misc

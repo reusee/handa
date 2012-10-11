@@ -58,14 +58,30 @@ func (self *Handa) GetMap(table string, index string, field string) (map[string]
   return self.NewCursor(false).GetMap(table, index, field)
 }
 
+func (self *Handa) GetMultiMap(table string, index string, fields string) (map[string][]string, error) {
+  return self.NewCursor(false).GetMultiMap(table, index, fields)
+}
+
 func (self *Handa) GetFilteredMap(table string, index string, field string, filters ...string) (map[string]string, error) {
   return self.NewCursor(false).GetFilteredMap(table, index, field, filters...)
+}
+
+func (self *Handa) GetMultiFilteredMap(table string, index string, fields string, filters ...string) (map[string][]string, error) {
+  return self.NewCursor(false).GetMultiFilteredMap(table, index, fields, filters...)
 }
 
 func (self *Handa) GetRangedMap(table string, index string, field string, start int, limit int) (map[string]string, error) {
   return self.NewCursor(false).GetRangedMap(table, index, field, start, limit)
 }
 
+func (self *Handa) GetMultiRangedMap(table string, index string, fields string, start int, limit int) (map[string][]string, error) {
+  return self.NewCursor(false).GetMultiRangedMap(table, index, fields, start, limit)
+}
+
 func (self *Handa) GetRangedFilteredMap(table string, index string, field string, start int, limit int, filters ...string) (map[string]string, error) {
   return self.NewCursor(false).GetRangedFilteredMap(table, index, field, start, limit, filters...)
+}
+
+func (self *Handa) GetMultiRangedFilteredMap(table string, index string, fields string, start int, limit int, filters ...string) (map[string][]string, error) {
+  return self.NewCursor(false).GetMultiRangedFilteredMap(table, index, fields, start, limit, filters...)
 }
