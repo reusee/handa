@@ -331,3 +331,16 @@ func TestGetRangedCol(t *testing.T) {
     }
   }
 }
+
+func TestTextFieldFilter(t *testing.T) {
+  table := fmt.Sprintf("test_%d", rand.Int63())
+  db.Insert(table, "c1", 5, "c2,c3", "foo", "bar")
+  db.Insert(table, "c1", 6, "c2,c3", "foo", "bar")
+  db.Insert(table, "c1", 7, "c2,c3", "foo", "bar")
+  db.Insert(table, "c1", 8, "c2,c3", "foo", "bar")
+  rows, err := db.GetFilteredCol(table, "c1", "c2=foo")
+  if err != nil {
+    t.Fatal("GetFilteredCol fail", err)
+  }
+  fmt.Printf("%s\n", rows)
+}
