@@ -8,6 +8,7 @@ import (
   tdh "github.com/reusee/go-tdhsocket"
   "sync"
   "strconv"
+  "strings"
 )
 
 var db *Handa
@@ -327,6 +328,46 @@ func TestGetRangedCol(t *testing.T) {
   for i := 0; i < len(res); i++ {
     resN, _ := strconv.Atoi(res[i])
     if resN != i {
+      t.Fail()
+    }
+  }
+
+  for i := 0; i < 10; i++ {
+    db.Insert(table, "n", i + 20, "foo", "bar")
+  }
+  res, err = db.GetRangedFilteredCol(table, "n", 1, 5, "foo=bar")
+  if err != nil {
+    t.Fail()
+  }
+  if len(res) != 5 {
+    t.Fail()
+  }
+}
+
+func TestGetRangedMap(t *testing.T) {
+  table := fmt.Sprintf("test_%d", rand.Int63())
+  for i := 0; i < 10; i++ {
+    db.Insert(table, "i", i, "s", strings.Repeat("OK", i))
+  }
+  res, err := db.GetRangedMap(table, "i", "s", 1, 7)
+  if err != nil {
+    t.Fail()
+  }
+  for i := 1; i <= 7; i++ {
+    if res[strconv.Itoa(i)] != strings.Repeat("OK", i) {
+      t.Fail()
+    }
+  }
+
+  for i := 30; i < 40; i++ {
+    db.Insert(table, "i", i, "s,p", strings.Repeat("FOO", i), "FOO")
+  }
+  res, err = db.GetRangedFilteredMap(table, "i", "s", 3, 5, "p=FOO")
+  if err != nil {
+    t.Fail()
+  }
+  for i := 33; i < 38; i++ {
+    if res[strconv.Itoa(i)] != strings.Repeat("FOO", i) {
       t.Fail()
     }
   }

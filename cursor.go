@@ -159,7 +159,6 @@ func (self *Cursor) getRows(table string, index string, fields []string, filterS
     }
   }
 
-  //TODO keys和op也应为参数
   rows, _, err = self.conn.Get(self.handa.dbname, table, index, fields,
     [][]string{[]string{"(null)"}}, tdh.GT, uint32(start), uint32(limit), filters)
   return
