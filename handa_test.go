@@ -240,7 +240,7 @@ func TestTextIndexInsert(t *testing.T) {
     t.Fail()
   }
 
-  n := 30
+  n := 10
   for i := 0; i < n; i++ {
     db.Insert(tablename, "textcol", strconv.Itoa(rand.Intn(2000000)), "")
   }
@@ -309,5 +309,25 @@ func TestMultiColumnIndex(t *testing.T) {
   cols, err = db.GetFilteredCol("price", "price", "itemid=1", "time=20121008")
   if len(cols) != 1 || cols[0] != "6.5" {
     t.Fail()
+  }
+}
+
+func TestGetRangedCol(t *testing.T) {
+  table := fmt.Sprintf("test_%d", rand.Int63())
+  for i := 0; i < 10; i++ {
+    db.Insert(table, "n", i, "")
+  }
+  res, err := db.GetRangedCol(table, "n", 0, 5)
+  if err != nil {
+    t.Fail()
+  }
+  if len(res) != 5 {
+    t.Fail()
+  }
+  for i := 0; i < len(res); i++ {
+    resN, _ := strconv.Atoi(res[i])
+    if resN != i {
+      t.Fail()
+    }
   }
 }

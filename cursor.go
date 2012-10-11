@@ -20,16 +20,14 @@ type Cursor struct {
   end chan bool
 }
 
+// update and insert
+
 func (self *Cursor) Update(table string, index string, key interface{}, fieldList string, values ...interface{}) (count int, change int, err error) {
   if !self.isValid { panic("Using an invalid cursor") }
   if !self.isBatch { defer func() {
     self.end <- true
   }()}
   dbIndex, _, dbKeys, _, _, dbFields, dbValues := self.handa.checkSchemaAndConvertData(table, index, key, fieldList, values...)
-  //fmt.Printf("dbIndex>> %v\n", dbIndex)
-  //fmt.Printf("dbKeys>> %v\n", dbKeys)
-  //fmt.Printf("dbFields>> %v\n", dbFields)
-  //fmt.Printf("dbValues>> %v\n", dbValues)
   count, change, err = self.conn.Update(self.handa.dbname, table, dbIndex,
     dbFields,
     [][]string{dbKeys}, tdh.EQ,
@@ -138,7 +136,7 @@ const (
 
 // get
 
-func (self *Cursor) getRows(table string, index string, fields []string, filterStrs []string) (rows [][][]byte, err error) {
+func (self *Cursor) getRows(table string, index string, fields []string, filterStrs []string, start int, limit int) (rows [][][]byte, err error) {
   if !self.isValid { panic("Using an invalid cursor") }
   if self.isBatch { panic("Not permit in batch mode") }
   if !self.isBatch { defer func() {
@@ -155,6 +153,7 @@ func (self *Cursor) getRows(table string, index string, fields []string, filterS
     }
     for i, filter := range filters { // convert text filed to hash field
       if self.handa.schema[table].columnType[filter.Field] == ColTypeString {
+        self.handa.ensureIndexExists(table, filters[i].Field)
         filters[i].Field = "hash_" + filters[i].Field
         filters[i].Value = mmh3Hex(filters[i].Value)
       }
@@ -163,14 +162,14 @@ func (self *Cursor) getRows(table string, index string, fields []string, filterS
 
   //TODO keys和op也应为参数
   rows, _, err = self.conn.Get(self.handa.dbname, table, index, fields,
-    [][]string{[]string{"(null)"}}, tdh.GT, 0, 0, filters)
+    [][]string{[]string{"(null)"}}, tdh.GT, uint32(start), uint32(limit), filters)
   return
 }
 
 // get col
 
-func (self *Cursor) getCol(table string, index string, filterStrs []string) ([]string, error) {
-  rows, err := self.getRows(table, index, []string{index}, filterStrs)
+func (self *Cursor) getCol(table string, index string, filterStrs []string, start int, limit int) ([]string, error) {
+  rows, err := self.getRows(table, index, []string{index}, filterStrs, start, limit)
   if err != nil {
     return nil, err
   }
@@ -184,17 +183,25 @@ func (self *Cursor) getCol(table string, index string, filterStrs []string) ([]s
 }
 
 func (self *Cursor) GetCol(table string, index string) ([]string, error) {
-  return self.getCol(table, index, nil)
+  return self.getCol(table, index, nil, 0, 0)
 }
 
 func (self *Cursor) GetFilteredCol(table string, index string, filters ...string) ([]string, error) {
-  return self.getCol(table, index, filters)
+  return self.getCol(table, index, filters, 0, 0)
+}
+
+func (self *Cursor) GetRangedCol(table string, index string, start int, limit int) ([]string, error) {
+  return self.getCol(table, index, nil, start, limit)
+}
+
+func (self *Cursor) GetRangedFilteredCol(table string, index string, start int, limit int, filters ...string) ([]string, error) {
+  return self.getCol(table, index, filters, start, limit)
 }
 
 // get map
 
-func (self *Cursor) getMap(table string, index string, field string, filterStrs []string) (map[string]string, error) {
-  rows, err := self.getRows(table, index, []string{index, field}, filterStrs)
+func (self *Cursor) getMap(table string, index string, field string, filterStrs []string, start int, limit int) (map[string]string, error) {
+  rows, err := self.getRows(table, index, []string{index, field}, filterStrs, start, limit)
   if err != nil {
     return nil, err
   }
@@ -206,12 +213,22 @@ func (self *Cursor) getMap(table string, index string, field string, filterStrs 
 }
 
 func (self *Cursor) GetMap(table string, index string, field string) (map[string]string, error) {
-  return self.getMap(table, index, field, nil)
+  return self.getMap(table, index, field, nil, 0, 0)
 }
 
 func (self *Cursor) GetFilteredMap(table string, index string, field string, filters ...string) (map[string]string, error) {
-  return self.getMap(table, index, field, filters)
+  return self.getMap(table, index, field, filters, 0, 0)
 }
+
+func (self *Cursor) GetRangedMap(table string, index string, field string, start int, limit int) (map[string]string, error) {
+  return self.getMap(table, index, field, nil, start, limit)
+}
+
+func (self *Cursor) GetRangedFilteredMap(table string, index string, field string, start int, limit int, filters ...string) (map[string]string, error) {
+  return self.getMap(table, index, field, filters, start, limit)
+}
+
+// misc
 
 func convertFilterStrings(strs []string) (out []tdh.Filter, err error) {
   out = make([]tdh.Filter, len(strs))

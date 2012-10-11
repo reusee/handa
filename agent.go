@@ -24,10 +24,26 @@ func (self *Handa) GetFilteredCol(table string, index string, filters ...string)
   return self.NewCursor(false).GetFilteredCol(table, index, filters...)
 }
 
+func (self *Handa) GetRangedCol(table string, index string, start int, limit int) ([]string, error) {
+  return self.NewCursor(false).GetRangedCol(table, index, start, limit)
+}
+
+func (self *Handa) GetRangedFilteredCol(table string, index string, start int, limit int, filters ...string) ([]string, error) {
+  return self.NewCursor(false).GetRangedFilteredCol(table, index, start, limit, filters...)
+}
+
 func (self *Handa) GetMap(table string, index string, field string) (map[string]string, error) {
   return self.NewCursor(false).GetMap(table, index, field)
 }
 
 func (self *Handa) GetFilteredMap(table string, index string, field string, filters ...string) (map[string]string, error) {
   return self.NewCursor(false).GetFilteredMap(table, index, field, filters...)
+}
+
+func (self *Handa) GetRangedMap(table string, index string, field string, start int, limit int) (map[string]string, error) {
+  return self.NewCursor(false).GetRangedMap(table, index, field, start, limit)
+}
+
+func (self *Handa) GetRangedFilteredMap(table string, index string, field string, start int, limit int, filters ...string) (map[string]string, error) {
+  return self.NewCursor(false).GetRangedFilteredMap(table, index, field, start, limit, filters...)
 }
