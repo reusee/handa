@@ -169,8 +169,8 @@ func (self *Handa) checkSchemaAndConvertData(table string, indexesStr string, ke
   if len(fields) == 1 && fields[0] == "" {
     fields = nil
   }
-  dbFields = make([]string, 0)
-  dbValues = make([]string, 0)
+  dbFields = make([]string, 0, len(fields))
+  dbValues = make([]string, 0, len(fields))
   for i, field := range fields {
     dbField := strings.TrimSpace(field)
     dbFields = append(dbFields, dbField)

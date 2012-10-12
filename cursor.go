@@ -256,9 +256,9 @@ func (self *Cursor) getMultiMap(table string, index string, fieldsStr string, fi
   }
   ret := make(map[string][]string)
   for _, row := range rows {
-    values := make([]string, 0)
-    for i := 1; i < len(row); i++ {
-      values = append(values, string(row[i]))
+    values := make([]string, len(row) - 1)
+    for i, col := range row[1:] {
+      values[i] = string(col)
     }
     ret[string(row[0])] = values
   }
