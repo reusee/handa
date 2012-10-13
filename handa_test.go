@@ -552,3 +552,10 @@ func TestGetMultiRangedFilteredMap(t *testing.T) {
     }
   }
 }
+
+func TestDefaultValue(t *testing.T) {
+  table := fmt.Sprintf("test_%d", rand.Int63())
+  db.Insert(table, "k", 1, "b,i,f,t,s", true, 5, 5.5, "hello", []byte("hello"))
+  db.Insert(table, "k", 2, "")
+  fmt.Printf("TestDefaultValue table %s\n", table)
+}

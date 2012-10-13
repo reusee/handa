@@ -215,23 +215,29 @@ func (self *Handa) ensureColumnExists(table string, column string, t int) (creat
   }
   _, exists := self.schema[table].columnType[column]
   if !exists {
-    var columnType string
+    var columnType, defaultValue string
     switch t {
     case ColTypeBool:
       columnType = "BOOLEAN"
+      defaultValue = "0"
     case ColTypeInt:
       columnType = "BIGINT(255)"
+      defaultValue = "0"
     case ColTypeFloat:
       columnType = "DOUBLE"
+      defaultValue = "0"
     case ColTypeLongString:
       columnType = "LONGTEXT"
+      defaultValue = "''"
     case ColTypeString:
       columnType = "VARCHAR(255)"
+      defaultValue = "''"
     case ColTypeHash:
       columnType = "CHAR(32)"
+      defaultValue = "''"
     }
     self.withTableCacheOff(func() {
-      self.mysqlQuery("ALTER TABLE `%s` ADD (`%s` %s NULL DEFAULT NULL)", table, column, columnType)
+      self.mysqlQuery("ALTER TABLE `%s` ADD (`%s` %s NULL DEFAULT %s)", table, column, columnType, defaultValue)
     })
     created = true
     self.schema[table] = self.loadTableInfo(table)
