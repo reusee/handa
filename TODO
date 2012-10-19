@@ -1,0 +1,19 @@
+自动处理batch的insert/update，维护一个主键缓存
+
+sql的select接口
+
+DDL操作要加锁
+
+加入排序
+统一的接口
+Col一个
+Map一个
+MultiCol一个
+MultiMap一个
+参数：
+  fields
+  filters
+  range
+  order
+
+Delete
