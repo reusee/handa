@@ -148,21 +148,7 @@ func (self *Cursor) getRows(table string, index string, fields []string, filterS
   indexCols := strings.Split(index, "$")
   index, isString = self.handa.ensureIndexExists(table, indexCols...)
 
-  var filters []tdh.Filter
-  if filterStrs != nil {
-    filters, err = convertFilterStrings(filterStrs)
-    if err != nil {
-      return
-    }
-    for i, filter := range filters { // convert text filed to hash field
-      if self.handa.schema[table].columnType[filter.Field] == ColTypeLongString {
-        filters[i].Field = "hash_" + filters[i].Field
-        filters[i].Value = mmh3Hex(filters[i].Value)
-      }
-    }
-  }
-
-  minKey := make([]string, len(isString))
+  minKey := make([]string, len(isString)) // match all rows
   for i, t := range isString {
     if t {
       minKey[i] = "(null)"
@@ -170,8 +156,72 @@ func (self *Cursor) getRows(table string, index string, fields []string, filterS
       minKey[i] = "-9223372036854775808"
     }
   }
+  key := [][]string{minKey}
+  op := tdh.GT
+  tableScan := true
+
+  var filters, convertedFilters []tdh.Filter
+  if filterStrs != nil {
+    convertedFilters, err = convertFilterStrings(filterStrs)
+    if err != nil {
+      return
+    }
+    filters = make([]tdh.Filter, 0, len(convertedFilters))
+    for i, filter := range convertedFilters { // convert text filed to hash field
+      if self.handa.schema[table].columnType[filter.Field] == ColTypeLongString {
+        filters[i].Field = "hash_" + filters[i].Field
+        filters[i].Value = mmh3Hex(filters[i].Value)
+      }
+      if tableScan && filter.Field == indexCols[0] && isConvertableOp(filter.Op) { // use key/op to filter
+        key = [][]string{[]string{filter.Value}}
+        op = convertOp(filter.Op)
+        tableScan = false
+        continue
+      }
+      filters = append(filters, filter)
+    }
+  }
+
   rows, _, err = self.conn.Get(self.handa.dbname, table, index, fields,
-    [][]string{minKey}, tdh.GT, uint32(start), uint32(limit), filters)
+    key, op, uint32(start), uint32(limit), filters)
+  return
+}
+
+func isConvertableOp(op uint8) (t bool) {
+  switch op {
+  case tdh.FILTER_EQ, tdh.FILTER_LE, tdh.FILTER_LT, tdh.FILTER_GE, tdh.FILTER_GT:
+    t = true
+  }
+  return
+}
+
+func convertOp(op uint8) (ret uint8) {
+  switch op {
+  case tdh.FILTER_EQ:
+    ret = tdh.EQ
+  case tdh.FILTER_LT:
+    ret = tdh.LT
+  case tdh.FILTER_LE:
+    ret = tdh.LE
+  case tdh.FILTER_GT:
+    ret = tdh.GT
+  case tdh.FILTER_GE:
+    ret = tdh.GE
+  }
+  return
+}
+
+func (self *Cursor) TdhGet(table string, index string, fields []string,
+key [][]string, op uint8,
+start uint32, limit uint32, filters []tdh.Filter) (rows [][][]byte, types []uint8, err error) {
+  if !self.isValid { panic("Using an invalid cursor") }
+  if self.isBatch { panic("Not permit in batch mode") }
+  if !self.isBatch { defer func() {
+    self.end <- true
+  }()}
+
+  rows, types, err = self.conn.Get(self.handa.dbname, table, index, fields,
+  key, op, start, limit, filters)
   return
 }
 

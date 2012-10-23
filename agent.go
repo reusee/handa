@@ -1,5 +1,17 @@
 package handa
 
+import (
+  tdh "github.com/reusee/go-tdhsocket"
+)
+
+// tdh
+
+func (self *Handa) TdhGet(table string, index string, fields []string,
+key [][]string, op uint8,
+start uint32, limit uint32, filters []tdh.Filter) (rows [][][]byte, types []uint8, err error) {
+  return self.NewCursor(false).TdhGet(table, index, fields, key, op, start, limit, filters)
+}
+
 // insert and update
 
 func (self *Handa) Update(table string, index string, key interface{}, fieldList string, values ...interface{}) (count int, change int, err error) {
