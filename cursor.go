@@ -145,7 +145,8 @@ func (self *Cursor) getRows(table string, index string, fields []string, filterS
   }()}
 
   var isString []bool
-  index, isString = self.handa.ensureIndexExists(table, index)
+  indexCols := strings.Split(index, "$")
+  index, isString = self.handa.ensureIndexExists(table, indexCols...)
 
   var filters []tdh.Filter
   if filterStrs != nil {
@@ -177,7 +178,14 @@ func (self *Cursor) getRows(table string, index string, fields []string, filterS
 // get col
 
 func (self *Cursor) getCol(table string, index string, filterStrs []string, start int, limit int) ([]string, error) {
-  rows, err := self.getRows(table, index, []string{index}, filterStrs, start, limit)
+  var fields []string
+  if indexSplit := strings.Split(index, ","); len(indexSplit) > 1 {
+    index = strings.TrimSpace(indexSplit[0])
+    fields = []string{strings.TrimSpace(indexSplit[1])}
+  } else {
+    fields = []string{index}
+  }
+  rows, err := self.getRows(table, index, fields, filterStrs, start, limit)
   if err != nil {
     return nil, err
   }
@@ -190,10 +198,15 @@ func (self *Cursor) getCol(table string, index string, filterStrs []string, star
 
 func (self *Cursor) getMultiCol(table string, fieldsStr string, filterStrs []string, start int, limit int) ([][]string, error) {
   fields := make([]string, 0)
-  for _, field := range strings.Split(fieldsStr, ",") {
-    fields = append(fields, strings.TrimSpace(field))
+  var index string
+  for i, field := range strings.Split(fieldsStr, ",") {
+    if i == 0 {
+      index = field
+    }
+    if !strings.Contains(field, "$") {
+      fields = append(fields, strings.TrimSpace(field))
+    }
   }
-  index := fields[0]
   rows, err := self.getRows(table, index, fields, filterStrs, start, limit)
   if err != nil {
     return nil, err
@@ -243,7 +256,14 @@ func (self *Cursor) GetMultiRangedFilteredCol(table string, index string, start 
 // get map
 
 func (self *Cursor) getMap(table string, index string, field string, filterStrs []string, start int, limit int) (map[string]string, error) {
-  rows, err := self.getRows(table, index, []string{index, field}, filterStrs, start, limit)
+  var fields []string
+  if indexSplit := strings.Split(index, ","); len(indexSplit) > 1 {
+    index = strings.TrimSpace(indexSplit[0])
+    fields = []string{strings.TrimSpace(indexSplit[1]), field}
+  } else {
+    fields = []string{index, field}
+  }
+  rows, err := self.getRows(table, index, fields, filterStrs, start, limit)
   if err != nil {
     return nil, err
   }
@@ -255,7 +275,13 @@ func (self *Cursor) getMap(table string, index string, field string, filterStrs 
 }
 
 func (self *Cursor) getMultiMap(table string, index string, fieldsStr string, filterStrs []string, start int, limit int) (map[string][]string, error) {
-  fields := []string{index}
+  var fields []string
+  if indexSplit := strings.Split(index, ","); len(indexSplit) > 1 {
+    index = strings.TrimSpace(indexSplit[0])
+    fields = []string{strings.TrimSpace(indexSplit[1])}
+  } else {
+    fields = []string{index}
+  }
   for _, field := range strings.Split(fieldsStr, ",") {
     fields = append(fields, strings.TrimSpace(field))
   }

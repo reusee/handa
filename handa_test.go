@@ -559,3 +559,59 @@ func TestDefaultValue(t *testing.T) {
   db.Insert(table, "k", 2, "")
   fmt.Printf("TestDefaultValue table %s\n", table)
 }
+
+func TestMulindex(t *testing.T) {
+  table := fmt.Sprintf("test_%d", rand.Int63())
+  for id := 1; id <= 10; id++ {
+    db.Insert(table, "id,time", []interface{}{id, 1000}, "price", id * 2)
+    db.Insert(table, "id,time", []interface{}{id, 2000}, "price", id * 3)
+    db.Insert(table, "id,time", []interface{}{id, 3000}, "price", id * 4)
+  }
+
+  res, err := db.GetMultiCol(table, "id$time, id, time")
+  if err != nil { t.Fatal(err) }
+  i := 0
+  for id := 1; id <= 10; id++ {
+    for _, time := range []int{1000, 2000, 3000} {
+      if res[i][0] != strconv.Itoa(id) || res[i][1] != strconv.Itoa(time) {
+        t.Fatal("GetMultiCol")
+      }
+      i++
+    }
+  }
+
+  res2, err := db.GetFilteredCol(table, "id$time, time", "id=3")
+  if err != nil { t.Fatal(err) }
+  for i, time := range []int{1000, 2000, 3000} {
+    if res2[i] != strconv.Itoa(time) {
+      t.Fatal("GetFilteredCol")
+    }
+  }
+
+  res3, err := db.GetMultiFilteredCol(table, "id$time, time, price", "id=2")
+  if err != nil { t.Fatal(err) }
+  prices := []int{4, 6, 8}
+  for i, time := range []int{1000, 2000, 3000} {
+    if res3[i][0] != strconv.Itoa(time) || res3[i][1] != strconv.Itoa(prices[i]) {
+      t.Fatal("GetMultiFilteredCol")
+    }
+  }
+
+  m, err := db.GetFilteredMap(table, "id$time, time", "price", "id=3")
+  if err != nil { t.Fatal(err) }
+  times := []string{"1000", "2000", "3000"}
+  prices2 := []string{"6", "9", "12"}
+  for i, time := range times {
+    if m[time] != prices2[i] {
+      t.Fatal("GetFilteredMap")
+    }
+  }
+
+  m2, err := db.GetMultiFilteredMap(table, "id$time, time", "price, time", "id=3")
+  if err != nil { t.Fatal(err) }
+  for i, time := range times {
+    if m2[time][0] != prices2[i] || m2[time][1] != time {
+      t.Fatal("GetMultiFilteredMap")
+    }
+  }
+}
