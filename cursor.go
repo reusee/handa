@@ -144,7 +144,8 @@ func (self *Cursor) getRows(table string, index string, fields []string, filterS
     self.end <- true
   }()}
 
-  index, _ = self.handa.ensureIndexExists(table, index)
+  var isString []bool
+  index, isString = self.handa.ensureIndexExists(table, index)
 
   var filters []tdh.Filter
   if filterStrs != nil {
@@ -160,8 +161,16 @@ func (self *Cursor) getRows(table string, index string, fields []string, filterS
     }
   }
 
+  minKey := make([]string, len(isString))
+  for i, t := range isString {
+    if t {
+      minKey[i] = "(null)"
+    } else {
+      minKey[i] = "-9223372036854775808"
+    }
+  }
   rows, _, err = self.conn.Get(self.handa.dbname, table, index, fields,
-    [][]string{[]string{"(null)"}}, tdh.GT, uint32(start), uint32(limit), filters)
+    [][]string{minKey}, tdh.GT, uint32(start), uint32(limit), filters)
   return
 }
 
