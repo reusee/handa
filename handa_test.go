@@ -616,9 +616,23 @@ func TestMulindex(t *testing.T) {
   }
 }
 
-func TestConcurrentCreatingTable(t *testing.T) {
+func TestConcurrentDDL(t *testing.T) {
   table := fmt.Sprintf("test_%d", rand.Int63())
+  wg := new(sync.WaitGroup)
+  wg.Add(10)
   for i := 0; i < 10; i++ {
-    go db.Insert(table, "t", i, "")
+    i := i
+    go func() {
+      db.Insert(table, "concurrent_column_creating", i, "")
+      wg.Done()
+    }()
+  }
+  wg.Wait()
+  rows, err := db.GetCol(table, "concurrent_column_creating")
+  if err != nil {
+    t.Fatal("get error")
+  }
+  if len(rows) != 10 {
+    t.Fatal("insert error")
   }
 }

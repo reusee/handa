@@ -30,6 +30,8 @@ type Handa struct {
   tableCacheVarCount int
 
   tableDDL chan tableDDLReq
+  columnDDL map[string]chan columnDDLReq
+  indexDDL map[string]chan indexDDLReq
 }
 
 func New(host string, port string, user string, password string, database string, tdhPort string) *Handa {
@@ -37,8 +39,10 @@ func New(host string, port string, user string, password string, database string
     tableCacheVarMutex: new(sync.Mutex),
   }
 
-  // table DDL listener
+  // DDL listeners
   self.startTableDDLListener()
+  self.columnDDL = make(map[string]chan columnDDLReq)
+  self.indexDDL = make(map[string]chan indexDDLReq)
 
   // init database connection pool
   self.dbname = database
@@ -70,6 +74,12 @@ func New(host string, port string, user string, password string, database string
 }
 
 func (self *Handa) loadTableInfo(tableName string) *TableInfo {
+  if self.columnDDL[tableName] == nil {
+    self.startColumnDDLListener(tableName)
+  }
+  if self.indexDDL[tableName] == nil {
+    self.startIndexDDLListener(tableName)
+  }
   tableInfo := &TableInfo{
     name: tableName,
     columnType: make(map[string]int),
@@ -283,13 +293,42 @@ func (self *Handa) ensureColumnExists(table string, column string, t int) (creat
       columnType = "CHAR(32)"
       defaultValue = "''"
     }
-    self.withTableCacheOff(func() {
-      self.mysqlQuery("ALTER TABLE `%s` ADD (`%s` %s NULL DEFAULT %s)", table, column, columnType, defaultValue)
-    })
-    created = true
-    self.schema[table] = self.loadTableInfo(table)
+    resp := make(chan bool)
+    self.columnDDL[table] <- columnDDLReq{resp, column, columnType, defaultValue}
+    created = <-resp
   }
   return
+}
+
+type columnDDLReq struct {
+  resp chan bool
+  column string
+  columnType string
+  defaultValue string
+}
+
+func (self *Handa) startColumnDDLListener(table string) {
+  //fmt.Printf("start columnDDL listener of %s\n", table)
+  self.columnDDL[table] = make(chan columnDDLReq)
+  go func() {
+    for {
+      req := <-self.columnDDL[table]
+      //fmt.Printf("req table %s column %s\n", table, req.column)
+      _, exists := self.schema[table].columnType[req.column]
+      if exists {
+        //println("exists")
+        req.resp <- false
+        continue
+      }
+      //fmt.Printf("creating column %s in table %s\n", req.column, table)
+      self.withTableCacheOff(func() {
+        self.mysqlQuery("ALTER TABLE `%s` ADD (`%s` %s NULL DEFAULT %s)",
+        table, req.column, req.columnType, req.defaultValue)
+      })
+      self.schema[table] = self.loadTableInfo(table)
+      req.resp <- true
+    }
+  }()
 }
 
 func (self *Handa) ensureIndexExists(table string, columns ...string) (indexName string, isString []bool) {
@@ -328,16 +367,40 @@ func (self *Handa) ensureIndexExists(table string, columns ...string) (indexName
       }
       quotedColumns[i] = "`" + indexSubnames[i] + "`"
     }
-    self.withTableCacheOff(func() {
-      _, _, err := self.mysqlQuery("CREATE UNIQUE INDEX `%s` ON `%s` (%s)",
-        indexName, table, strings.Join(quotedColumns, ","))
-      if err != nil {
-        log.Fatal("table ", table, " index creation error ", err)
-      }
-    })
-    self.schema[table] = self.loadTableInfo(table)
+    resp := make(chan bool)
+    self.indexDDL[table] <- indexDDLReq{resp, indexName, strings.Join(quotedColumns, ",")}
+    <-resp
   }
   return
+}
+
+type indexDDLReq struct {
+  resp chan bool
+  index string
+  columns string
+}
+
+func (self *Handa) startIndexDDLListener(table string) {
+  self.indexDDL[table] = make(chan indexDDLReq)
+  go func() {
+    for {
+      req := <-self.indexDDL[table]
+      if self.schema[table].index[req.index] {
+        req.resp <- true
+        continue
+      }
+      //fmt.Printf("creating index %s in table %s\n", req.index, table)
+      self.withTableCacheOff(func() {
+        _, _, err := self.mysqlQuery("CREATE UNIQUE INDEX `%s` ON `%s` (%s)",
+        req.index, table, req.columns)
+        if err != nil {
+          log.Fatal("table ", table, " index creation error ", err)
+        }
+      })
+      self.schema[table] = self.loadTableInfo(table)
+      req.resp <- true
+    }
+  }()
 }
 
 func (self *Handa) NewCursor(isBatch bool) *Cursor {
