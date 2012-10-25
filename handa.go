@@ -4,13 +4,14 @@ import (
   "log"
   "fmt"
   "strings"
+  "sync"
 
   tdh "github.com/reusee/go-tdhsocket"
   "github.com/reusee/mmh3"
 
   "github.com/ziutek/mymysql/autorc"
   "github.com/ziutek/mymysql/mysql"
-  _ "github.com/ziutek/mymysql/native" 
+  _ "github.com/ziutek/mymysql/native"
 )
 
 var (
@@ -24,10 +25,15 @@ type Handa struct {
 
   dbname string
   schema map[string]*TableInfo
+
+  tableCacheVarMutex *sync.Mutex
+  tableCacheVarCount int
 }
 
 func New(host string, port string, user string, password string, database string, tdhPort string) *Handa {
-  self := new(Handa)
+  self := &Handa{
+    tableCacheVarMutex: new(sync.Mutex),
+  }
 
   // init database connection pool
   self.dbname = database
@@ -189,11 +195,23 @@ func (self *Handa) checkSchemaAndConvertData(table string, indexesStr string, ke
 }
 
 func (self *Handa) withTableCacheOff(fun func()) {
-  _, _, err := self.mysqlQuery("SET GLOBAL tdh_socket_cache_table_on=0")
-  defer self.mysqlQuery("SET GLOBAL tdh_socket_cache_table_on=1")
-  if err != nil {
-    panic("need SUPER privileges to set global variable")
+  self.tableCacheVarMutex.Lock()
+  self.tableCacheVarCount++
+  if self.tableCacheVarCount == 1 {
+    _, _, err := self.mysqlQuery("SET GLOBAL tdh_socket_cache_table_on=0")
+    if err != nil {
+      panic("need SUPER privileges to set global variable")
+    }
   }
+  self.tableCacheVarMutex.Unlock()
+  defer func() {
+    self.tableCacheVarMutex.Lock()
+    self.tableCacheVarCount--
+    if self.tableCacheVarCount == 0 {
+      self.mysqlQuery("SET GLOBAL tdh_socket_cache_table_on=1")
+    }
+    self.tableCacheVarMutex.Unlock()
+  }()
   fun()
 }
 

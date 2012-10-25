@@ -12,6 +12,12 @@ start uint32, limit uint32, filters []tdh.Filter) (rows [][][]byte, types []uint
   return self.NewCursor(false).TdhGet(table, index, fields, key, op, start, limit, filters)
 }
 
+func (self *Handa) TdhDelete(table string, index string, fields []string,
+key [][]string, op uint8,
+start uint32, limit uint32, filters []tdh.Filter) (int, error) {
+  return self.NewCursor(false).TdhDelete(table, index, fields, key, op, start, limit, filters)
+}
+
 // insert and update
 
 func (self *Handa) Update(table string, index string, key interface{}, fieldList string, values ...interface{}) (count int, change int, err error) {

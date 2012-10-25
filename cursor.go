@@ -21,6 +21,36 @@ type Cursor struct {
   end chan bool
 }
 
+// tdh
+
+func (self *Cursor) TdhGet(table string, index string, fields []string,
+key [][]string, op uint8,
+start uint32, limit uint32, filters []tdh.Filter) (rows [][][]byte, types []uint8, err error) {
+  if !self.isValid { panic("Using an invalid cursor") }
+  if self.isBatch { panic("Not permit in batch mode") }
+  if !self.isBatch { defer func() {
+    self.end <- true
+  }()}
+
+  rows, types, err = self.conn.Get(self.handa.dbname, table, index, fields,
+  key, op, start, limit, filters)
+  return
+}
+
+func (self *Cursor) TdhDelete(table string, index string, fields []string,
+key [][]string, op uint8,
+start uint32, limit uint32, filters []tdh.Filter) (change int, err error) {
+  if !self.isValid { panic("Using an invalid cursor") }
+  if self.isBatch { panic("Not permit in batch mode") }
+  if !self.isBatch { defer func() {
+    self.end <- true
+  }()}
+
+  change, err = self.conn.Delete(self.handa.dbname, table, index, fields,
+  key, op, start, limit, filters)
+  return
+}
+
 // update and insert
 
 func (self *Cursor) Update(table string, index string, key interface{}, fieldList string, values ...interface{}) (count int, change int, err error) {
@@ -208,20 +238,6 @@ func convertOp(op uint8) (ret uint8) {
   case tdh.FILTER_GE:
     ret = tdh.GE
   }
-  return
-}
-
-func (self *Cursor) TdhGet(table string, index string, fields []string,
-key [][]string, op uint8,
-start uint32, limit uint32, filters []tdh.Filter) (rows [][][]byte, types []uint8, err error) {
-  if !self.isValid { panic("Using an invalid cursor") }
-  if self.isBatch { panic("Not permit in batch mode") }
-  if !self.isBatch { defer func() {
-    self.end <- true
-  }()}
-
-  rows, types, err = self.conn.Get(self.handa.dbname, table, index, fields,
-  key, op, start, limit, filters)
   return
 }
 
