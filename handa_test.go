@@ -615,3 +615,10 @@ func TestMulindex(t *testing.T) {
     }
   }
 }
+
+func TestConcurrentCreatingTable(t *testing.T) {
+  table := fmt.Sprintf("test_%d", rand.Int63())
+  for i := 0; i < 10; i++ {
+    go db.Insert(table, "t", i, "")
+  }
+}

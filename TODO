@@ -1,8 +1,9 @@
 DDL操作要加锁
 对所有表，都发起一个ddl进程，以接收此表所有的ddl操作。
 对所有请求都顺序阻塞地处理，如果请求所需要的操作已经由前面的请求完成，则直接返回，不进行sql操作
-对建表请求，也有一个专门的进程
-tdh_socket_cache_table_on这个变量由一个全局变量维护
+操作：
+  ALTER TABLE
+  CREATE UNIQUE INDEX
 
 自动处理batch的insert/update，维护一个主键缓存
 

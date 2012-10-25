@@ -28,12 +28,17 @@ type Handa struct {
 
   tableCacheVarMutex *sync.Mutex
   tableCacheVarCount int
+
+  tableDDL chan tableDDLReq
 }
 
 func New(host string, port string, user string, password string, database string, tdhPort string) *Handa {
   self := &Handa{
     tableCacheVarMutex: new(sync.Mutex),
   }
+
+  // table DDL listener
+  self.startTableDDLListener()
 
   // init database connection pool
   self.dbname = database
@@ -215,15 +220,39 @@ func (self *Handa) withTableCacheOff(fun func()) {
   fun()
 }
 
+type tableDDLReq struct {
+  table string
+  resp chan bool
+}
+
+func (self *Handa) startTableDDLListener() {
+  self.tableDDL = make(chan tableDDLReq)
+  go func() {
+    for {
+      req := <-self.tableDDL
+      _, exists := self.schema[req.table]
+      if exists {
+        req.resp <- true
+        continue
+      }
+      //fmt.Printf("creating table %s\n", req.table)
+      self.withTableCacheOff(func() {
+        self.mysqlQuery(`CREATE TABLE IF NOT EXISTS %s (
+          serial SERIAL
+        ) engine=InnoDB`, req.table)
+      })
+      self.schema[req.table] = self.loadTableInfo(req.table)
+      req.resp <- true
+    }
+  }()
+}
+
 func (self *Handa) ensureTableExists(table string) {
   _, exists := self.schema[table]
   if !exists {
-    self.withTableCacheOff(func() {
-      self.mysqlQuery(`CREATE TABLE IF NOT EXISTS %s (
-        serial SERIAL
-      ) engine=InnoDB`, table)
-    })
-    self.schema[table] = self.loadTableInfo(table)
+    resp := make(chan bool)
+    self.tableDDL <- tableDDLReq{table, resp}
+    <-resp
   }
 }
 
